@@ -46,7 +46,7 @@
 
 - Tracer C is "done" when: a reminder line in the file triggers a Discord notification at the correct local time and confirms with the exact line, with tests for DST edge cases.
 
-- [ ] Implement reminders file parser (line grammar, invalid line handling); add tests for parsing edge cases.
+- [x] Implement reminders file parser (line grammar, invalid line handling); add tests for parsing edge cases.
 - [ ] Implement reminder ID assignment (rid format) and safe append logic; add tests for id stability.
 - [ ] Implement scheduler scan + due detection (Europe/London time rules); add tests for DST edge cases.
 - [ ] Implement reminder lifecycle actions (one-off delete, recurring keep); add tests for file edits.
