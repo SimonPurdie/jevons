@@ -96,8 +96,16 @@ function createDiscordRuntime(options) {
   if (!resolvedModel || !completeFn) {
     const piAi = resolvePiAi();
     const getModelFn = getModelOverride || piAi.getModel;
+    const getModelsFn = piAi.getModels;
     if (!resolvedModel) {
       resolvedModel = getModelFn(provider, model, providers);
+      if (!resolvedModel) {
+        const available = typeof getModelsFn === 'function' ? getModelsFn(provider) : [];
+        const names = available.map((entry) => entry.id || entry);
+        const preview = names.slice(0, 10).join(', ');
+        const suffix = names.length > 10 ? '…' : '';
+        throw new Error(`Unknown model "${model}" for provider "${provider}". Available: ${preview}${suffix}`);
+      }
     }
     if (!completeFn) {
       completeFn = piAi.completeSimple;
