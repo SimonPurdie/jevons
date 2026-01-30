@@ -105,7 +105,13 @@ function applyEnvOverrides(config, env) {
 function loadConfig(options = {}) {
   const cwd = options.cwd || process.cwd();
   const env = options.env || process.env;
-  const configPath = options.configPath || path.join(cwd, 'config', 'jevons.config.json');
+  let configPath = options.configPath || path.join(cwd, 'config', 'jevons.config.json');
+  if (!options.configPath && !fs.existsSync(configPath)) {
+    const legacyPath = path.join(cwd, 'config', 'config.json');
+    if (fs.existsSync(legacyPath)) {
+      configPath = legacyPath;
+    }
+  }
   const envPath = options.envPath || path.join(cwd, 'config', '.env');
   const baseConfig = readConfigFile(configPath);
   const fileEnv = readEnvFile(envPath);

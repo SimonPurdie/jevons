@@ -23,6 +23,16 @@ test('loadConfig returns empty object when config file missing', () => {
   assert.deepEqual(config, {});
 });
 
+test('loadConfig reads legacy config/config.json when present', () => {
+  const dir = makeTempDir();
+  const configDir = path.join(dir, 'config');
+  fs.mkdirSync(configDir, { recursive: true });
+  const data = { discord: { channel_id: 'legacy' } };
+  fs.writeFileSync(path.join(configDir, 'config.json'), JSON.stringify(data, null, 2));
+  const config = loadConfig({ cwd: dir, env: {} });
+  assert.deepEqual(config, data);
+});
+
 test('loadConfig reads config file when present', () => {
   const dir = makeTempDir();
   const data = {
