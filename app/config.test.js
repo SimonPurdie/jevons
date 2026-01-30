@@ -50,3 +50,24 @@ test('loadConfig applies environment overrides', () => {
   assert.equal(config.discord.channel_id, '123');
   assert.equal(config.reminders.timezone, 'Europe/London');
 });
+
+test('loadConfig reads config/.env file when present', () => {
+  const dir = makeTempDir();
+  writeConfig(dir, {});
+  const envPath = path.join(dir, 'config', '.env');
+  fs.writeFileSync(envPath, 'JEVONS_MODEL_NAME=gemini-3-flash-preview\n');
+  const config = loadConfig({ cwd: dir, env: {} });
+  assert.equal(config.model.model, 'gemini-3-flash-preview');
+});
+
+test('loadConfig prefers process env over config/.env file', () => {
+  const dir = makeTempDir();
+  writeConfig(dir, {});
+  const envPath = path.join(dir, 'config', '.env');
+  fs.writeFileSync(envPath, 'JEVONS_MODEL_PROVIDER=google\n');
+  const env = {
+    JEVONS_MODEL_PROVIDER: 'openai',
+  };
+  const config = loadConfig({ cwd: dir, env });
+  assert.equal(config.model.provider, 'openai');
+});

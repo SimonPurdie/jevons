@@ -6,6 +6,7 @@ const ENV_MAP = {
   JEVONS_DISCORD_CHANNEL_ID: ['discord', 'channel_id'],
   JEVONS_MODEL_PROVIDER: ['model', 'provider'],
   JEVONS_MODEL_NAME: ['model', 'model'],
+  JEVONS_MODEL_API_KEY: ['model', 'api_key'],
   JEVONS_MEMORY_LOGS_ROOT: ['memory', 'logs_root'],
   JEVONS_MEMORY_INDEX_PATH: ['memory', 'index_path'],
   JEVONS_MEMORY_PINS_PATH: ['memory', 'pins_path'],
@@ -52,6 +53,44 @@ function readConfigFile(configPath) {
   return JSON.parse(raw);
 }
 
+function stripQuotes(value) {
+  if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
+    return value.slice(1, -1);
+  }
+  if (value.length >= 2 && value.startsWith("'") && value.endsWith("'")) {
+    return value.slice(1, -1);
+  }
+  return value;
+}
+
+function readEnvFile(envPath) {
+  if (!fs.existsSync(envPath)) {
+    return {};
+  }
+  const raw = fs.readFileSync(envPath, 'utf8');
+  if (!raw.trim()) {
+    return {};
+  }
+  const result = {};
+  const lines = raw.split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) {
+      continue;
+    }
+    const eqIndex = trimmed.indexOf('=');
+    if (eqIndex === -1) {
+      continue;
+    }
+    const key = trimmed.slice(0, eqIndex).trim();
+    const value = stripQuotes(trimmed.slice(eqIndex + 1).trim());
+    if (key) {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
 function applyEnvOverrides(config, env) {
   const result = mergeDeep({}, config);
   for (const [envKey, pathParts] of Object.entries(ENV_MAP)) {
@@ -68,12 +107,16 @@ function loadConfig(options = {}) {
   const cwd = options.cwd || process.cwd();
   const env = options.env || process.env;
   const configPath = options.configPath || path.join(cwd, 'config', 'jevons.config.json');
+  const envPath = options.envPath || path.join(cwd, 'config', '.env');
   const baseConfig = readConfigFile(configPath);
-  return applyEnvOverrides(baseConfig, env);
+  const fileEnv = readEnvFile(envPath);
+  const mergedEnv = { ...fileEnv, ...env };
+  return applyEnvOverrides(baseConfig, mergedEnv);
 }
 
 module.exports = {
   loadConfig,
   readConfigFile,
   applyEnvOverrides,
+  readEnvFile,
 };
