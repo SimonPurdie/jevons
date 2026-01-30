@@ -221,11 +221,11 @@ test('createDiscordRuntime logs user messages and agent replies', async () => {
 test('createDiscordRuntime injects memories before user prompt', async () => {
   const client = new MockDiscordClient();
   const sends = [];
-  let receivedContent = null;
+  let receivedMessages = null;
   const injection = 'INJECTED_CONTEXT_RELEVANT_MEMORIES\n{"budget_tokens_est":1,"memories":[]}';
   const modelInstance = { id: 'model-test' };
   const completeSimple = async (model, request) => {
-    receivedContent = request.messages[0].content;
+    receivedMessages = request.messages;
     return { content: [{ type: 'text', text: 'Hello user' }] };
   };
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jevons-runtime-test-'));
@@ -248,8 +248,10 @@ test('createDiscordRuntime injects memories before user prompt', async () => {
     client.emit('messageCreate', makeMessage({ channelId: 'root', content: 'Hello bot' }));
     await flush();
 
-    assert.ok(receivedContent.startsWith(injection));
-    assert.ok(receivedContent.endsWith('Hello bot'));
+    // Get the last message (current user message with injection)
+    const lastMessage = receivedMessages[receivedMessages.length - 1];
+    assert.ok(lastMessage.content.startsWith(injection));
+    assert.ok(lastMessage.content.endsWith('Hello bot'));
 
     const logsDir = path.join(tempDir, 'logs', 'discord-channel', 'root');
     const files = fs.readdirSync(logsDir);
@@ -493,6 +495,220 @@ test('createDiscordRuntime /new with whitespace is still recognized', async () =
 
     const confirmation = sends.find(s => s.content.includes('Context window reset'));
     assert.ok(confirmation, 'Should recognize /new with whitespace');
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('createDiscordRuntime passes chat history to model', async () => {
+  const client = new MockDiscordClient();
+  const sends = [];
+  const modelInstance = { id: 'model-test' };
+  const calls = [];
+  const completeSimple = async (model, request) => {
+    calls.push(request.messages);
+    return { content: [{ type: 'text', text: 'reply' }] };
+  };
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jevons-runtime-test-'));
+
+  try {
+    createDiscordRuntime({
+      client,
+      token: 'token-123',
+      channelId: 'root',
+      modelInstance,
+      completeSimple,
+      logsRoot: tempDir,
+      sendMessage: (payload) => {
+        sends.push(payload);
+        return Promise.resolve();
+      },
+    });
+
+    // Send first message
+    client.emit('messageCreate', makeMessage({ channelId: 'root', content: 'First message', messageId: 'msg-1' }));
+    await flush();
+
+    // Send second message - should include history
+    client.emit('messageCreate', makeMessage({ channelId: 'root', content: 'Second message', messageId: 'msg-2' }));
+    await flush();
+
+    // Should have 2 calls
+    assert.equal(calls.length, 2);
+    
+    // First call should have 1 message (no history yet)
+    assert.equal(calls[0].length, 1);
+    assert.equal(calls[0][0].role, 'user');
+    assert.equal(calls[0][0].content, 'First message');
+    
+    // Second call should have 3 messages: user1, assistant1, user2
+    assert.equal(calls[1].length, 3);
+    assert.equal(calls[1][0].role, 'user');
+    assert.equal(calls[1][0].content, 'First message');
+    assert.equal(calls[1][1].role, 'assistant');
+    assert.equal(calls[1][1].content, 'reply');
+    assert.equal(calls[1][2].role, 'user');
+    assert.equal(calls[1][2].content, 'Second message');
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('createDiscordRuntime chat history respects /new reset', async () => {
+  const client = new MockDiscordClient();
+  const sends = [];
+  const modelInstance = { id: 'model-test' };
+  const calls = [];
+  const completeSimple = async (model, request) => {
+    calls.push(request.messages);
+    return { content: [{ type: 'text', text: 'reply' }] };
+  };
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jevons-runtime-test-'));
+
+  try {
+    createDiscordRuntime({
+      client,
+      token: 'token-123',
+      channelId: 'root',
+      modelInstance,
+      completeSimple,
+      logsRoot: tempDir,
+      sendMessage: (payload) => {
+        sends.push(payload);
+        return Promise.resolve();
+      },
+    });
+
+    // Send first message
+    client.emit('messageCreate', makeMessage({ channelId: 'root', content: 'Before reset' }));
+    await flush();
+
+    // Send /new command (doesn't call model)
+    client.emit('messageCreate', makeMessage({ channelId: 'root', content: '/new' }));
+    await flush();
+
+    // Send message after reset
+    client.emit('messageCreate', makeMessage({ channelId: 'root', content: 'After reset' }));
+    await flush();
+
+    // Should have 2 model calls (not counting /new)
+    assert.equal(calls.length, 2);
+    
+    // First call: 1 message
+    assert.equal(calls[0].length, 1);
+    assert.equal(calls[0][0].content, 'Before reset');
+    
+    // Second call (after reset): should have only 1 message (no history from before)
+    assert.equal(calls[1].length, 1);
+    assert.equal(calls[1][0].role, 'user');
+    assert.equal(calls[1][0].content, 'After reset');
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('createDiscordRuntime chat history works in threads', async () => {
+  const client = new MockDiscordClient();
+  const sends = [];
+  const modelInstance = { id: 'model-test' };
+  const calls = [];
+  const completeSimple = async (model, request) => {
+    calls.push(request.messages);
+    return { content: [{ type: 'text', text: 'reply' }] };
+  };
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jevons-runtime-test-'));
+
+  try {
+    createDiscordRuntime({
+      client,
+      token: 'token-123',
+      channelId: 'root',
+      modelInstance,
+      completeSimple,
+      logsRoot: tempDir,
+      sendMessage: (payload) => {
+        sends.push(payload);
+        return Promise.resolve();
+      },
+    });
+
+    // Send messages in thread
+    client.emit('messageCreate', makeMessage({
+      channelId: 'thread-1',
+      parentId: 'root',
+      isThread: true,
+      content: 'Thread message 1',
+    }));
+    await flush();
+
+    client.emit('messageCreate', makeMessage({
+      channelId: 'thread-1',
+      parentId: 'root',
+      isThread: true,
+      content: 'Thread message 2',
+    }));
+    await flush();
+
+    // Should have 2 calls
+    assert.equal(calls.length, 2);
+    
+    // First thread call should have 1 message
+    assert.equal(calls[0].length, 1);
+    assert.equal(calls[0][0].content, 'Thread message 1');
+    
+    // Second thread call should have 3 messages (user1, assistant1, user2)
+    assert.equal(calls[1].length, 3);
+    assert.equal(calls[1][0].content, 'Thread message 1');
+    assert.equal(calls[1][1].role, 'assistant');
+    assert.equal(calls[1][2].content, 'Thread message 2');
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('createDiscordRuntime chat history is isolated per context', async () => {
+  const client = new MockDiscordClient();
+  const sends = [];
+  const modelInstance = { id: 'model-test' };
+  const calls = [];
+  const completeSimple = async (model, request) => {
+    calls.push({ context: 'thread', messages: request.messages.length });
+    return { content: [{ type: 'text', text: 'reply' }] };
+  };
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jevons-runtime-test-'));
+
+  try {
+    createDiscordRuntime({
+      client,
+      token: 'token-123',
+      channelId: 'root',
+      modelInstance,
+      completeSimple,
+      logsRoot: tempDir,
+      sendMessage: (payload) => {
+        sends.push(payload);
+        return Promise.resolve();
+      },
+    });
+
+    // Send message in main channel
+    client.emit('messageCreate', makeMessage({ channelId: 'root', content: 'Main channel message' }));
+    await flush();
+
+    // Send message in thread
+    client.emit('messageCreate', makeMessage({
+      channelId: 'thread-1',
+      parentId: 'root',
+      isThread: true,
+      content: 'Thread message',
+    }));
+    await flush();
+
+    // Should have 2 calls
+    assert.equal(calls.length, 2);
+    
+    // Second call (thread) should have only 1 message (no history from main channel)
+    assert.equal(calls[1].messages, 1, 'Thread should have no history from main channel');
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }

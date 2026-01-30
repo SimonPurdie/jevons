@@ -4,6 +4,7 @@ const { formatMemoryInjection } = require('../memory/index/injection');
 const { retrieveMemories } = require('../memory/index/retrieval');
 const { generateEmbedding } = require('../memory/index/embeddings');
 const { readLogEntry } = require('../memory/logs/logReader');
+const { readChatHistory } = require('../memory/chatHistory');
 
 function resolvePiAi() {
   try {
@@ -71,8 +72,19 @@ async function generateReply(payload, modelInstance, completeFn, options = {}) {
     }
   }
 
+  // Build messages array with chat history
+  const messages = [];
+
+  // Add chat history if available
+  if (options.chatHistory && options.chatHistory.length > 0) {
+    messages.push(...options.chatHistory);
+  }
+
+  // Add current user message
+  messages.push({ role: 'user', content });
+
   const response = await completeFn(modelInstance, {
-    messages: [{ role: 'user', content }],
+    messages,
   });
   const reply = extractReplyContent(response);
   if (!reply || !reply.trim()) {
@@ -190,6 +202,16 @@ function createDiscordRuntime(options) {
     });
   }
 
+  function getChatHistoryForContext(contextId, threadId) {
+    if (!windowResolver) {
+      return [];
+    }
+    const surface = getSurfaceFromContext(contextId, threadId);
+    const window = windowResolver.getOrCreateContextWindow(surface, contextId);
+    // Read history from the current window's log file
+    return readChatHistory(window.path);
+  }
+
   if (!modelInstance && (!provider || !model)) {
     throw new Error('model provider and model name are required');
   }
@@ -264,6 +286,9 @@ function createDiscordRuntime(options) {
           return;
         }
 
+        // Get chat history for this context BEFORE logging current message
+        const chatHistory = getChatHistoryForContext(payload.contextId, payload.threadId);
+
         // Log user message
         logEvent(payload, 'user', payload.content, {
           authorId: payload.authorId,
@@ -274,6 +299,7 @@ function createDiscordRuntime(options) {
         try {
           reply = await generateReply(payload, resolvedModel, completeFn, {
             injection: memoryInjectionProvider,
+            chatHistory,
           });
         } catch (err) {
           const errorMessage = formatModelError(err);

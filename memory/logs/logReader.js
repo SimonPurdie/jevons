@@ -48,7 +48,31 @@ function readLogEntry(filePath, lineNumber) {
   };
 }
 
+function readAllLogEntries(filePath) {
+  if (!filePath || !fs.existsSync(filePath)) {
+    return [];
+  }
+
+  const content = fs.readFileSync(filePath, 'utf8');
+  const lines = content.split('\n');
+  const entries = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const parsed = parseLogLine(lines[i]);
+    if (parsed) {
+      entries.push({
+        ...parsed,
+        path: filePath,
+        line: i + 1,
+      });
+    }
+  }
+
+  return entries;
+}
+
 module.exports = {
   parseLogLine,
   readLogEntry,
+  readAllLogEntries,
 };

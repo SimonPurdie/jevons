@@ -32,6 +32,7 @@
 - [x] Implement embedding reconciliation job (find missing embeddings, enqueue); add tests for coverage.
 - [x] Implement memory retrieval (similarity + recency + MMR + pinned-first); add tests for ranking outcomes.
 - [x] Implement memory injection (JSON schema + token heuristics, injected-before-prompt); add tests for truncation and budgets.
+- [x] Implement prompt-side chat history windowing (per context window, injected before user prompt); add tests for history ordering and /new reset behavior.
 
 --- Tracer B: memory UX expansion
 
