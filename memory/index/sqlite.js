@@ -173,6 +173,17 @@ class EmbeddingsIndex {
     return this._rowToEntry(row);
   }
 
+  async getByPathAndLine(filePath, lineNumber) {
+    const sql = 'SELECT * FROM embeddings WHERE path = ? AND line = ?';
+    const row = await this.get(sql, [filePath, lineNumber]);
+
+    if (!row) {
+      return null;
+    }
+
+    return this._rowToEntry(row);
+  }
+
   async getByContextId(contextId) {
     const sql = 'SELECT * FROM embeddings WHERE context_id = ? ORDER BY timestamp';
     const rows = await this.all(sql, [contextId]);
