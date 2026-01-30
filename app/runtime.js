@@ -7,12 +7,21 @@ const { readLogEntry } = require('../memory/logs/logReader');
 const { readChatHistory } = require('../memory/chatHistory');
 const { createPinsManager } = require('../memory/pins/pins');
 const { loadSkill } = require('../skills/loader');
+const { createBashTool } = require('./tools/bash');
 
 function resolvePiAi() {
   try {
     return require('@mariozechner/pi-ai');
   } catch (err) {
     throw new Error('pi-ai is not installed; run npm install');
+  }
+}
+
+async function resolvePiAgentCore() {
+  try {
+    return await import('@mariozechner/pi-agent-core');
+  } catch (err) {
+    throw new Error('pi-agent-core is not installed; run npm install');
   }
 }
 
@@ -152,6 +161,78 @@ function normalizePiAiMessages(messages, modelInstance) {
   });
 }
 
+function extractTextFromBlocks(blocks) {
+  if (!Array.isArray(blocks)) {
+    return null;
+  }
+  for (const block of blocks) {
+    if (!block) {
+      continue;
+    }
+    if (typeof block === 'string') {
+      return block;
+    }
+    if (typeof block.text === 'string') {
+      return block.text;
+    }
+    if (typeof block.content === 'string') {
+      return block.content;
+    }
+    if (block.type === 'text' && typeof block.text === 'string') {
+      return block.text;
+    }
+  }
+  return null;
+}
+
+function extractLatestAssistantText(messages) {
+  if (!Array.isArray(messages)) {
+    return null;
+  }
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i];
+    if (!message || message.role !== 'assistant') {
+      continue;
+    }
+    if (typeof message.content === 'string') {
+      return message.content;
+    }
+    const text = extractTextFromBlocks(message.content);
+    if (text && text.trim()) {
+      return text;
+    }
+  }
+  return null;
+}
+
+function buildSystemPrompt(skills) {
+  if (!skills || skills.length === 0) {
+    return '';
+  }
+  const skillsContent = skills.map((skill) => skill.content).join('\n\n');
+  return `You have access to the following skills:\n\n${skillsContent}\n\nUse the bash tool to execute these skills when needed.`;
+}
+
+function normalizeHistoryMessages(history, modelInstance) {
+  if (!Array.isArray(history)) {
+    return [];
+  }
+  const normalized = normalizePiAiMessages(history, modelInstance);
+  const now = Date.now();
+  return normalized.map((msg) => {
+    if (!msg || typeof msg !== 'object') {
+      return msg;
+    }
+    if (msg.role === 'user') {
+      return {
+        ...msg,
+        timestamp: msg.timestamp || now,
+      };
+    }
+    return msg;
+  });
+}
+
 async function generateReply(payload, modelInstance, completeFn, options = {}) {
   if (!payload || typeof payload.content !== 'string') {
     return null;
@@ -170,29 +251,27 @@ async function generateReply(payload, modelInstance, completeFn, options = {}) {
     }
   }
 
-  // Build messages array with chat history
-  const messages = [];
+  const { Agent } = await resolvePiAgentCore();
 
-  // Add skills if available
-  if (options.skills && options.skills.length > 0) {
-    const skillsContent = options.skills.map(s => s.content).join('\n\n');
-    messages.push({ role: 'system', content: `You have access to the following skills:\n\n${skillsContent}\n\nUse the bash tool to execute these skills when needed.` });
-  }
+  const systemPrompt = buildSystemPrompt(options.skills);
+  const historyMessages = normalizeHistoryMessages(options.chatHistory || [], modelInstance);
 
-  // Add chat history if available
-  if (options.chatHistory && options.chatHistory.length > 0) {
-    messages.push(...options.chatHistory);
-  }
-
-  // Add current user message
-  messages.push({ role: 'user', content });
-
-  const normalizedMessages = normalizePiAiMessages(messages, modelInstance);
-
-  const response = await completeFn(modelInstance, {
-    messages: normalizedMessages,
+  const agent = new Agent({
+    initialState: {
+      systemPrompt,
+      model: modelInstance,
+      tools: Array.isArray(options.tools) ? options.tools : [],
+      messages: historyMessages,
+    },
   });
-  const reply = extractReplyContent(response);
+
+  await agent.prompt({
+    role: 'user',
+    content,
+    timestamp: Date.now(),
+  });
+
+  const reply = extractLatestAssistantText(agent.state.messages);
   if (!reply || !reply.trim()) {
     throw new Error('Model response missing content');
   }
@@ -309,6 +388,8 @@ function createDiscordRuntime(options) {
       }
     }
   }
+
+  const runtimeTools = [createBashTool(process.cwd())];
 
   // Set up context window resolver for logging if logsRoot is provided
   const windowResolver = logsRoot ? createContextWindowResolver({ logsRoot }) : null;
@@ -497,6 +578,7 @@ function createDiscordRuntime(options) {
             injection: memoryInjectionProvider,
             chatHistory,
             skills: loadedSkills,
+            tools: runtimeTools,
           });
         } catch (err) {
           const errorMessage = formatModelError(err);
