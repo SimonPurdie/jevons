@@ -86,6 +86,7 @@ function createDiscordBot(options) {
       content: message.content || '',
       authorId: message.author ? message.author.id : null,
       messageId: message.id || null,
+      referencedMessageId: message.reference && message.reference.messageId ? message.reference.messageId : null,
       ...context,
     });
   });

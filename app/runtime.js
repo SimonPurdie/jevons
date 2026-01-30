@@ -5,6 +5,7 @@ const { retrieveMemories } = require('../memory/index/retrieval');
 const { generateEmbedding } = require('../memory/index/embeddings');
 const { readLogEntry } = require('../memory/logs/logReader');
 const { readChatHistory } = require('../memory/chatHistory');
+const { createPinsManager } = require('../memory/pins/pins');
 
 function resolvePiAi() {
   try {
@@ -255,6 +256,10 @@ function createDiscordRuntime(options) {
     return typeof content === 'string' && content.trim() === '/new';
   }
 
+  function isRememberCommand(content) {
+    return typeof content === 'string' && content.trim().startsWith('/remember');
+  }
+
   const bot = createDiscordBot({
     client,
     token,
@@ -282,6 +287,69 @@ function createDiscordRuntime(options) {
             if (typeof onError === 'function') {
               onError(err);
             }
+          }
+          return;
+        }
+
+        // Handle /remember command: pin the referenced message
+        if (isRememberCommand(payload.content)) {
+          // Extract the replied message ID if this is a reply
+          const repliedMessageId = payload.referencedMessageId || null;
+
+          const pinsManager = createPinsManager({
+            indexPath: memoryIndexPath,
+            logsRoot,
+          });
+
+          try {
+            const result = await pinsManager.handleRememberCommand(
+              payload.content,
+              repliedMessageId,
+              payload.contextId
+            );
+
+            // Log the pin action
+            logEvent(payload, 'agent', result.message, {
+              action: 'pin',
+              success: result.success,
+              pinnedMessageId: result.entry ? result.entry.id : null,
+            });
+
+            // Send confirmation to Discord
+            await sendMessage({
+              content: result.message,
+              channelId: payload.channelId,
+              threadId: payload.threadId,
+              contextId: payload.contextId,
+              messageId: payload.messageId,
+              authorId: payload.authorId,
+            });
+          } catch (err) {
+            const errorMessage = `Failed to pin message: ${err.message}`;
+            logEvent(payload, 'agent', errorMessage, {
+              action: 'pin',
+              success: false,
+              error: err.message,
+            });
+            try {
+              await sendMessage({
+                content: errorMessage,
+                channelId: payload.channelId,
+                threadId: payload.threadId,
+                contextId: payload.contextId,
+                messageId: payload.messageId,
+                authorId: payload.authorId,
+              });
+            } catch (sendErr) {
+              if (typeof onError === 'function') {
+                onError(sendErr);
+              }
+            }
+            if (typeof onError === 'function') {
+              onError(err);
+            }
+          } finally {
+            await pinsManager.close();
           }
           return;
         }
