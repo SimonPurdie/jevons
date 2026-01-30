@@ -5,6 +5,7 @@ const {
   parseRemindersFile,
   generateReminderId,
   formatReminderLine,
+  assignMissingIds,
   VALID_RECURRENCE,
   ID_PATTERN,
   DATE_PATTERN,
@@ -530,4 +531,217 @@ test('TIME_PATTERN rejects incorrect times', () => {
   assert.ok(!TIME_PATTERN.test('14.30')); // Wrong separator
   assert.ok(!TIME_PATTERN.test('14:30:00')); // With seconds
   assert.ok(!TIME_PATTERN.test('1430')); // No separator
+});
+
+// ==================== assignMissingIds tests ====================
+
+test('assignMissingIds returns empty result for null input', () => {
+  const result = assignMissingIds(null);
+  assert.equal(result.content, '');
+  assert.deepEqual(result.assigned, []);
+  assert.equal(result.unchanged, 0);
+});
+
+test('assignMissingIds returns empty result for undefined input', () => {
+  const result = assignMissingIds(undefined);
+  assert.equal(result.content, '');
+  assert.deepEqual(result.assigned, []);
+  assert.equal(result.unchanged, 0);
+});
+
+test('assignMissingIds returns unchanged for empty string', () => {
+  const result = assignMissingIds('');
+  assert.equal(result.content, '');
+  assert.deepEqual(result.assigned, []);
+  assert.equal(result.unchanged, 0);
+});
+
+test('assignMissingIds assigns ID to valid line without ID', () => {
+  const content = '- [ ] date=2026-01-30 time=14:23 recur=none msg="Test reminder"';
+  const result = assignMissingIds(content);
+  
+  assert.equal(result.assigned.length, 1);
+  assert.ok(result.assigned[0].id.startsWith('rid_'));
+  assert.ok(ID_PATTERN.test(result.assigned[0].id));
+  assert.equal(result.assigned[0].lineNumber, 1);
+  assert.equal(result.assigned[0].oldLine, content);
+  assert.ok(result.content.includes(`id=${result.assigned[0].id}`));
+  assert.equal(result.unchanged, 0);
+});
+
+test('assignMissingIds does not modify line with existing ID', () => {
+  const content = '- [ ] date=2026-01-30 time=14:23 recur=none msg="Test reminder" id=rid_K5V4M2J3Q2ZL';
+  const result = assignMissingIds(content);
+  
+  assert.equal(result.assigned.length, 0);
+  assert.equal(result.content, content);
+  assert.equal(result.unchanged, 1);
+});
+
+test('assignMissingIds does not modify invalid lines', () => {
+  const content = 'Invalid line without task marker';
+  const result = assignMissingIds(content);
+  
+  assert.equal(result.assigned.length, 0);
+  assert.equal(result.content, content);
+  assert.equal(result.unchanged, 1);
+});
+
+test('assignMissingIds does not modify empty lines', () => {
+  const content = '\n\n';
+  const result = assignMissingIds(content);
+  
+  assert.equal(result.assigned.length, 0);
+  assert.equal(result.content, content);
+  assert.equal(result.unchanged, 3); // 3 empty lines (including trailing)
+});
+
+test('assignMissingIds does not modify comment lines', () => {
+  const content = '# This is a comment\n  # Indented comment';
+  const result = assignMissingIds(content);
+  
+  assert.equal(result.assigned.length, 0);
+  assert.equal(result.content, content);
+  assert.equal(result.unchanged, 2);
+});
+
+test('assignMissingIds handles mixed content correctly', () => {
+  const content = `# Reminders file
+- [ ] date=2026-01-30 time=09:00 recur=daily msg="Daily standup" id=rid_AAAAAAAAAAAA
+
+- [ ] date=2026-01-31 time=14:00 recur=none msg="One-off meeting"
+Invalid line here
+- [ ] date=2026-02-01 time=10:00 recur=weekly msg="Weekly review"
+
+# End of file`;
+  
+  const result = assignMissingIds(content);
+  
+  // Should assign IDs to 2 lines that don't have them
+  assert.equal(result.assigned.length, 2);
+  assert.equal(result.unchanged, 6); // 2 comments, 1 empty, 1 with existing ID, 1 invalid, 1 empty
+  
+  // Verify the lines that got IDs
+  const linesWithoutId = result.assigned.map(a => a.lineNumber);
+  assert.ok(linesWithoutId.includes(4)); // One-off meeting
+  assert.ok(linesWithoutId.includes(6)); // Weekly review
+  
+  // Verify assigned IDs are valid
+  for (const assignment of result.assigned) {
+    assert.ok(ID_PATTERN.test(assignment.id));
+    assert.ok(assignment.newLine.includes(`id=${assignment.id}`));
+  }
+  
+  // Verify the content with existing ID is unchanged
+  assert.ok(result.content.includes('id=rid_AAAAAAAAAAAA'));
+});
+
+test('assignMissingIds preserves original line structure', () => {
+  const content = '- [ ] date=2026-01-30 time=14:23 recur=none msg="Test reminder"';
+  const result = assignMissingIds(content);
+  
+  // The ID should be appended after the msg field
+  const parsed = parseReminderLine(result.content);
+  assert.ok(parsed);
+  assert.equal(parsed.date, '2026-01-30');
+  assert.equal(parsed.time, '14:23');
+  assert.equal(parsed.recur, 'none');
+  assert.equal(parsed.msg, 'Test reminder');
+  assert.ok(parsed.id);
+});
+
+test('assignMissingIds assigns unique IDs to multiple lines', () => {
+  const content = `- [ ] date=2026-01-30 time=09:00 recur=none msg="First"
+- [ ] date=2026-01-31 time=10:00 recur=none msg="Second"
+- [ ] date=2026-02-01 time=11:00 recur=none msg="Third"`;
+  
+  const result = assignMissingIds(content);
+  
+  assert.equal(result.assigned.length, 3);
+  
+  // All IDs should be unique
+  const ids = result.assigned.map(a => a.id);
+  const uniqueIds = new Set(ids);
+  assert.equal(uniqueIds.size, 3);
+});
+
+test('assignMissingIds preserves whitespace after msg field', () => {
+  const content = '- [ ] date=2026-01-30 time=14:23 recur=none msg="Test reminder"    ';
+  const result = assignMissingIds(content);
+  
+  // The ID should be inserted before the trailing whitespace
+  assert.ok(result.content.includes('msg="Test reminder" id='));
+});
+
+test('assignMissingIds handles msg with escaped quotes', () => {
+  const content = '- [ ] date=2026-01-30 time=14:23 recur=none msg="Say \\"hello\\" to everyone"';
+  const result = assignMissingIds(content);
+  
+  assert.equal(result.assigned.length, 1);
+  const parsed = parseReminderLine(result.content);
+  assert.ok(parsed);
+  assert.equal(parsed.msg, 'Say "hello" to everyone');
+  assert.ok(parsed.id);
+});
+
+test('assignMissingIds roundtrips correctly', () => {
+  const original = {
+    date: '2026-01-30',
+    time: '14:23',
+    recur: 'weekly',
+    msg: 'Weekly meeting',
+    id: null,
+  };
+  
+  const line = formatReminderLine(original);
+  const result = assignMissingIds(line);
+  
+  assert.equal(result.assigned.length, 1);
+  
+  // The resulting line should be parseable and have the same data
+  const parsed = parseReminderLine(result.content);
+  assert.ok(parsed);
+  assert.equal(parsed.date, original.date);
+  assert.equal(parsed.time, original.time);
+  assert.equal(parsed.recur, original.recur);
+  assert.equal(parsed.msg, original.msg);
+  assert.ok(parsed.id);
+});
+
+test('assignMissingIds generates valid IDs that pass pattern validation', () => {
+  const content = `- [ ] date=2026-01-30 time=09:00 recur=none msg="First"
+- [ ] date=2026-01-31 time=10:00 recur=none msg="Second"`;
+  
+  const result = assignMissingIds(content);
+  
+  for (const assignment of result.assigned) {
+    assert.ok(ID_PATTERN.test(assignment.id), `ID ${assignment.id} should match pattern`);
+  }
+});
+
+test('assigned entries track correct line numbers', () => {
+  const content = `# Comment
+- [ ] date=2026-01-30 time=09:00 recur=none msg="Line 2"
+
+- [ ] date=2026-01-31 time=10:00 recur=none msg="Line 4"
+Invalid line
+- [ ] date=2026-02-01 time=11:00 recur=none msg="Line 6"`;
+  
+  const result = assignMissingIds(content);
+  
+  assert.equal(result.assigned.length, 3);
+  assert.equal(result.assigned[0].lineNumber, 2);
+  assert.equal(result.assigned[1].lineNumber, 4);
+  assert.equal(result.assigned[2].lineNumber, 6);
+});
+
+test('assignMissingIds does not modify content when all lines have IDs', () => {
+  const content = `- [ ] date=2026-01-30 time=09:00 recur=none msg="First" id=rid_AAAAAAAAAAAA
+- [ ] date=2026-01-31 time=10:00 recur=none msg="Second" id=rid_BBBBBBBBBBBB`;
+  
+  const result = assignMissingIds(content);
+  
+  assert.equal(result.assigned.length, 0);
+  assert.equal(result.content, content);
+  assert.equal(result.unchanged, 2);
 });

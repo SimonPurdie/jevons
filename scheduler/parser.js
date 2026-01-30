@@ -215,17 +215,96 @@ function generateReminderId() {
  */
 function formatReminderLine(reminder) {
   const { date, time, recur, msg, id } = reminder;
-  
+
   // Escape quotes in message
   const escapedMsg = msg.replace(/"/g, '\\"');
-  
+
   let line = `- [ ] date=${date} time=${time} recur=${recur} msg="${escapedMsg}"`;
-  
+
   if (id) {
     line += ` id=${id}`;
   }
-  
+
   return line;
+}
+
+/**
+ * Assign IDs to reminder lines that don't have them
+ * Safely appends generated IDs to valid reminder lines without modifying invalid lines
+ *
+ * @param {string} content - The file content to process
+ * @returns {object} Object with:
+ *   - content: The modified content with IDs appended
+ *   - assigned: Array of {lineNumber, oldLine, newLine, id} for each ID assigned
+ *   - unchanged: Count of lines that already had IDs or were invalid/empty/comments
+ */
+function assignMissingIds(content) {
+  if (!content || typeof content !== 'string') {
+    return {
+      content: content || '',
+      assigned: [],
+      unchanged: 0,
+    };
+  }
+
+  const lines = content.split('\n');
+  const assigned = [];
+  let unchanged = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // Skip empty lines and comments
+    if (!trimmed || trimmed.startsWith('#')) {
+      unchanged++;
+      continue;
+    }
+
+    // Try to parse the line
+    const parsed = parseReminderLine(line);
+
+    if (!parsed) {
+      // Invalid line - leave unchanged
+      unchanged++;
+      continue;
+    }
+
+    if (parsed.id) {
+      // Already has an ID - leave unchanged
+      unchanged++;
+      continue;
+    }
+
+    // Valid line without ID - generate and append
+    const newId = generateReminderId();
+
+    // Append ID to the end of the line, preserving original whitespace/structure
+    // Find the end of the msg field to append after it
+    const msgEndMatch = line.match(/msg="(?:[^"\\]|\\.)*"/);
+    if (msgEndMatch) {
+      const msgEndIndex = line.indexOf(msgEndMatch[0]) + msgEndMatch[0].length;
+      const before = line.slice(0, msgEndIndex);
+      const after = line.slice(msgEndIndex);
+      lines[i] = `${before} id=${newId}${after}`;
+    } else {
+      // Fallback: just append to the end
+      lines[i] = `${line} id=${newId}`;
+    }
+
+    assigned.push({
+      lineNumber: i + 1,
+      oldLine: line,
+      newLine: lines[i],
+      id: newId,
+    });
+  }
+
+  return {
+    content: lines.join('\n'),
+    assigned,
+    unchanged,
+  };
 }
 
 module.exports = {
@@ -233,6 +312,7 @@ module.exports = {
   parseRemindersFile,
   generateReminderId,
   formatReminderLine,
+  assignMissingIds,
   VALID_RECURRENCE,
   ID_PATTERN,
   DATE_PATTERN,
