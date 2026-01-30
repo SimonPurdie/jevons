@@ -1,0 +1,8 @@
+{
+  "name": "jevons",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "test": "node --test"
+  }
+}
