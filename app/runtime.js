@@ -161,6 +161,32 @@ function normalizePiAiMessages(messages, modelInstance) {
   });
 }
 
+const fs = require('fs');
+const path = require('path');
+
+function logContextToFile(context) {
+  const logsDir = path.join(process.cwd(), 'logs');
+  const contextPath = path.join(logsDir, 'context.txt');
+  
+  try {
+    const logEntry = {
+      "systemPrompt": context.systemPrompt,
+      "model": context.model,
+      "tools": context.tools,
+      "messages": context.messages,
+      "prompt": {
+        "role": "user",
+        "content": context.userContent,
+        "timestamp": context.timestamp,
+      },
+    };
+
+    fs.writeFileSync(contextPath, JSON.stringify(logEntry, null, 2));
+  } catch (err) {
+    // Silently fail - logging should not interrupt bot operation
+  }
+}
+
 function extractTextFromBlocks(blocks) {
   if (!Array.isArray(blocks)) {
     return null;
@@ -242,11 +268,13 @@ async function generateReply(payload, modelInstance, completeFn, options = {}) {
     return null;
   }
 
+  let injectionText = null;
   let content = trimmed;
   const injectionFn = options.injection;
   if (typeof injectionFn === 'function') {
     const injected = await injectionFn(trimmed, payload);
     if (injected) {
+      injectionText = injected;
       content = `${injected}\n${trimmed}`;
     }
   }
@@ -263,6 +291,15 @@ async function generateReply(payload, modelInstance, completeFn, options = {}) {
       tools: Array.isArray(options.tools) ? options.tools : [],
       messages: historyMessages,
     },
+  });
+
+  logContextToFile({
+    systemPrompt,
+    model: modelInstance,
+    tools: Array.isArray(options.tools) ? options.tools : [],
+    messages: historyMessages,
+    userContent: content,
+    timestamp: Date.now(),
   });
 
   await agent.prompt({
