@@ -76,7 +76,9 @@ test('MemoryRetriever calculateRecency uses current time by default', () => {
   const retriever = new MemoryRetriever();
   const now = new Date();
   const recency = retriever.calculateRecency(now.toISOString());
-  assert.equal(recency, 1);
+  // Use a small epsilon because strict equality fails due to microsecond differences
+  // between the test 'now' and the function's internal 'now'
+  assert.ok(recency > 0.9999, `Recency ${recency} should be close to 1`);
 });
 
 test('MemoryRetriever calculates diversity penalty correctly', async () => {
