@@ -22,7 +22,7 @@
 
 - Tracer A is "done" when: a Discord message yields a model reply, the reply is sent, and an append-only log entry is written in the correct context window (channel/thread), with tests covering happy path.
 
-- [ ] Implement model serving (pi-mono provider integration, provider-agnostic calls); add tests/mocks for provider selection and request shape.
+- [x] Implement model serving (pi-mono provider integration, provider-agnostic calls); add tests/mocks for provider selection and request shape.
 - [ ] Implement event log writer (append-only markdown, per context window); add tests for format and immutability behavior.
 - [ ] Implement log naming rules and path resolver; add tests for timestamp/seq uniqueness.
 - [ ] Implement /new command to end a context window and reset per-window chat history; add tests around state reset.
