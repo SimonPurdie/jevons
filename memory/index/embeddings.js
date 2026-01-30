@@ -23,6 +23,9 @@ function sleep(ms) {
 
 async function generateEmbedding(text, options = {}) {
   const config = { ...DEFAULT_CONFIG, ...options };
+  if (!config.embeddingModel) {
+    config.embeddingModel = DEFAULT_CONFIG.embeddingModel;
+  }
   if (!config.apiKey) {
     throw new Error('Google GenAI apiKey is required for embedding generation.');
   }
@@ -62,6 +65,9 @@ async function generateEmbedding(text, options = {}) {
 class EmbeddingQueue {
   constructor(options = {}) {
     this.config = { ...DEFAULT_CONFIG, ...options };
+    if (!this.config.embeddingModel) {
+      this.config.embeddingModel = DEFAULT_CONFIG.embeddingModel;
+    }
     this.queue = [];
     this.processing = false;
     this.paused = false;

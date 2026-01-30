@@ -9,7 +9,8 @@
   "memory": {
     "logs_root": "data",
     "index_path": "data/index/embeddings.sqlite3",
-    "pins_path": "data/pins"
+    "pins_path": "data/pins",
+    "embedding_model": "text-embedding-004"
   },
   "reminders": {
     "file_path": "/mnt/f/Obsidian-Vaults/Simon/Reminders.md",

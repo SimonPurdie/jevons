@@ -16,34 +16,77 @@ function resolvePiAi() {
 }
 
 function extractReplyContent(response) {
+  const extractFromBlocks = (blocks) => {
+    if (!Array.isArray(blocks)) {
+      return null;
+    }
+    for (const block of blocks) {
+      if (!block) {
+        continue;
+      }
+      if (typeof block === 'string') {
+        return block;
+      }
+      if (typeof block.text === 'string') {
+        return block.text;
+      }
+      if (typeof block.content === 'string') {
+        return block.content;
+      }
+      if (typeof block.thinking === 'string') {
+        return block.thinking;
+      }
+      if (block.type === 'text' && typeof block.text === 'string') {
+        return block.text;
+      }
+    }
+    return null;
+  };
+
   if (!response) {
     return null;
   }
   if (typeof response === 'string') {
     return response;
   }
+  if (typeof response.output_text === 'string') {
+    return response.output_text;
+  }
+  if (response.output && typeof response.output.text === 'string') {
+    return response.output.text;
+  }
   if (typeof response.text === 'string') {
     return response.text;
   }
-  if (response.message && typeof response.message.content === 'string') {
-    return response.message.content;
-  }
-  if (Array.isArray(response.content)) {
-    for (const block of response.content) {
-      if (block && block.type === 'text' && typeof block.text === 'string') {
-        return block.text;
-      }
+  if (response.message) {
+    if (typeof response.message.content === 'string') {
+      return response.message.content;
     }
+    const messageBlockText = extractFromBlocks(response.message.content);
+    if (messageBlockText) {
+      return messageBlockText;
+    }
+  }
+  const contentBlockText = extractFromBlocks(response.content);
+  if (contentBlockText) {
+    return contentBlockText;
   }
   if (Array.isArray(response.choices)) {
     for (const choice of response.choices) {
       if (choice && choice.message && typeof choice.message.content === 'string') {
         return choice.message.content;
       }
+      const choiceMessageBlocks = extractFromBlocks(choice && choice.message && choice.message.content);
+      if (choiceMessageBlocks) {
+        return choiceMessageBlocks;
+      }
       if (choice && typeof choice.text === 'string') {
         return choice.text;
       }
     }
+  }
+  if (typeof response.errorMessage === 'string') {
+    return response.errorMessage;
   }
   return null;
 }
@@ -53,6 +96,59 @@ function formatModelError(err) {
     return `API error: ${err.message}`;
   }
   return 'API error: request failed';
+}
+
+function normalizePiAiMessages(messages, modelInstance) {
+  if (!Array.isArray(messages)) {
+    return [];
+  }
+  return messages.map((msg) => {
+    if (!msg || typeof msg !== 'object') {
+      return msg;
+    }
+    if (msg.role === 'assistant') {
+      const needsWrap = typeof msg.content === 'string';
+      const hasArray = Array.isArray(msg.content);
+      const contentBlocks = needsWrap
+        ? [{ type: 'text', text: msg.content }]
+        : hasArray
+          ? msg.content
+          : [];
+      const normalized = {
+        ...msg,
+        content: contentBlocks,
+      };
+      if (normalized.timestamp === undefined) {
+        normalized.timestamp = Date.now();
+      }
+      if (normalized.stopReason === undefined) {
+        normalized.stopReason = 'stop';
+      }
+      if (!normalized.usage) {
+        normalized.usage = {
+          input: 0,
+          output: 0,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 0,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        };
+      }
+      if (modelInstance) {
+        if (normalized.api === undefined && modelInstance.api) {
+          normalized.api = modelInstance.api;
+        }
+        if (normalized.provider === undefined && modelInstance.provider) {
+          normalized.provider = modelInstance.provider;
+        }
+        if (normalized.model === undefined && modelInstance.id) {
+          normalized.model = modelInstance.id;
+        }
+      }
+      return normalized;
+    }
+    return msg;
+  });
 }
 
 async function generateReply(payload, modelInstance, completeFn, options = {}) {
@@ -84,8 +180,10 @@ async function generateReply(payload, modelInstance, completeFn, options = {}) {
   // Add current user message
   messages.push({ role: 'user', content });
 
+  const normalizedMessages = normalizePiAiMessages(messages, modelInstance);
+
   const response = await completeFn(modelInstance, {
-    messages,
+    messages: normalizedMessages,
   });
   const reply = extractReplyContent(response);
   if (!reply || !reply.trim()) {
