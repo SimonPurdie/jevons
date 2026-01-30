@@ -17,7 +17,7 @@ function parseLogLine(line) {
   return {
     timestamp,
     role,
-    content: messageContent.replace(/\s*\([^)]*\)$/, ''),
+    content: messageContent.replace(/\s*\([^)]*\)$/, '').replace(/\\n/g, '\n'),
   };
 }
 

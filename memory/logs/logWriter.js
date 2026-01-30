@@ -90,7 +90,7 @@ function createLogWriter(options) {
   function append(entry) {
     const timestamp = entry.timestamp || formatTimestamp();
     const role = entry.role;
-    const content = entry.content || '';
+    const content = (entry.content || '').replace(/\n/g, '\\n');
     const metadata = entry.metadata;
 
     let line = `- **${timestamp}** [${role}] ${content}`;
