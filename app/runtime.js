@@ -373,6 +373,12 @@ async function generateReply(payload, modelInstance, completeFn, options = {}) {
 
   const reply = extractLatestAssistantText(agent.state.messages);
   if (!reply || !reply.trim()) {
+    const hasToolCalls = agent.state.messages.some(m => m.role === 'assistant' && Array.isArray(m.content) && m.content.some(c => c.type === 'tool_call'));
+    if (hasToolCalls) {
+      // If the model made tool calls but didn't provide a final summary, 
+      // return a default acknowledgement.
+      return 'Action completed.';
+    }
     throw new Error('Model response missing content');
   }
   return reply;
@@ -664,10 +670,14 @@ function createDiscordRuntime(options) {
 
         // Create tools with per-message IPC context
         const extraEnv = {
-          JEVONS_IPC_PORT: ipcPort,
-          JEVONS_CHANNEL_ID: payload.channelId,
-          JEVONS_THREAD_ID: payload.threadId,
+          JEVONS_IPC_PORT: String(ipcPort),
         };
+        if (payload.channelId && payload.channelId !== 'null') {
+          extraEnv.JEVONS_CHANNEL_ID = payload.channelId;
+        }
+        if (payload.threadId && payload.threadId !== 'null') {
+          extraEnv.JEVONS_THREAD_ID = payload.threadId;
+        }
         const runtimeTools = [createBashTool(process.cwd(), extraEnv)];
 
         let reply;

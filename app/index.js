@@ -17,7 +17,14 @@ function createDiscordClient() {
 
 async function sendDiscordMessage(client, payload) {
   const { content, channelId, threadId } = payload;
-  const targetId = threadId || channelId;
+  let targetId = (threadId && threadId !== 'null') ? threadId : channelId;
+  
+  if (targetId === 'null') targetId = null;
+
+  if (!targetId) {
+    throw new Error('Unable to send message: No valid channelId or threadId provided');
+  }
+
   const channel = await client.channels.fetch(targetId);
   if (!channel || typeof channel.send !== 'function') {
     throw new Error(`Unable to send message to channel ${targetId}`);

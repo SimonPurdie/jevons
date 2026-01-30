@@ -5,6 +5,19 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { createDiscordRuntime } = require('../../app/runtime');
+const { registerApiProvider } = require('@mariozechner/pi-ai');
+
+registerApiProvider('test-api', {
+  streamSimple: async (model, messages, options) => {
+    const modelInstance = typeof model === 'object' ? model : { id: model };
+    const result = await modelInstance.completeSimple(messages, options);
+    return {
+      content: result.content,
+      usage: result.usage || { input: 0, output: 0, totalTokens: 0 },
+      stopReason: 'stop'
+    };
+  }
+});
 
 class MockDiscordClient extends EventEmitter {
   constructor() {
@@ -45,18 +58,19 @@ function flush() {
 
 test('createDiscordRuntime sends model reply via sendMessage', async () => {
   const client = new MockDiscordClient();
-  const sends = [];
-  const modelInstance = { id: 'model-test' };
-  const completeSimple = async () => ({
-    content: [{ type: 'text', text: 'hi there' }],
-  });
+  const modelInstance = { 
+    id: 'model-test', 
+    api: 'test-api',
+    completeSimple: async () => ({
+      content: [{ type: 'text', text: 'hi there' }],
+    })
+  };
 
   createDiscordRuntime({
     client,
     token: 'token-123',
     channelId: 'root',
     modelInstance,
-    completeSimple,
     sendMessage: (payload) => {
       sends.push(payload);
       return Promise.resolve();
