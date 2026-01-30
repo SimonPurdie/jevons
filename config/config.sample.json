@@ -1,0 +1,19 @@
+{
+  "discord": {
+    "token": "CHANGE_ME",
+    "channel_id": "123456789012345678"
+  },
+  "model": {
+    "provider": "openai",
+    "model": "gpt-4.1-mini"
+  },
+  "memory": {
+    "logs_root": "memory/logs",
+    "index_path": "memory/index/embeddings.sqlite3",
+    "pins_path": "memory/pins"
+  },
+  "reminders": {
+    "file_path": "/abs/path/to/obsidian/Reminders.md",
+    "timezone": "Europe/London"
+  }
+}

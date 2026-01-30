@@ -14,7 +14,7 @@
 ---
 
 - [x] Initialize repo skeleton per directory sketch; add placeholders and brief READMEs in key dirs.
-- [ ] Define config loading strategy (env + config files) and add a sample config template.
+- [x] Define config loading strategy (env + config files) and add a sample config template.
 - [ ] Implement Discord bot bootstrap (connect, basic message receive, thread handling); add smoke tests/mocks.
 - [ ] Implement /new command to end a context window and reset per-window chat history; add tests around state reset.
 - [ ] Implement event log writer (append-only markdown, per context window); add tests for format and immutability behavior.
