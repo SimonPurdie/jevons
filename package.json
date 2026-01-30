@@ -6,7 +6,7 @@
     "test": "node --test"
   },
   "dependencies": {
-    "@mariozechner/pi-ai": "^0.0.0",
+    "@mariozechner/pi-ai": "^0.5.32",
     "discord.js": "^14.0.0"
   }
 }

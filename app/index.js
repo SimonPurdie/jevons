@@ -2,14 +2,6 @@ const { Client, GatewayIntentBits } = require('discord.js');
 const { loadConfig } = require('./config');
 const { createDiscordRuntime } = require('./runtime');
 
-function buildProviderOptions(modelConfig) {
-  const options = { ...(modelConfig.options || {}) };
-  if (modelConfig.google_api_key && options.apiKey === undefined) {
-    options.apiKey = modelConfig.google_api_key;
-  }
-  return options;
-}
-
 function createDiscordClient() {
   return new Client({
     intents: [
@@ -53,7 +45,6 @@ function startDiscordRuntime() {
     channelId: discordConfig.channel_id,
     provider: modelConfig.provider,
     model: modelConfig.model,
-    providerOptions: buildProviderOptions(modelConfig),
     sendMessage: (payload) => sendDiscordMessage(client, payload),
     onReady: () => {
       // eslint-disable-next-line no-console

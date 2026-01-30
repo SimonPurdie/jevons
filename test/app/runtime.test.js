@@ -43,19 +43,17 @@ function flush() {
 test('createDiscordRuntime sends model reply via sendMessage', async () => {
   const client = new MockDiscordClient();
   const sends = [];
-  const providerFactory = () => ({
-    createChatCompletion: async () => ({
-      choices: [{ message: { content: 'hi there' } }],
-    }),
+  const modelInstance = { id: 'model-test' };
+  const completeSimple = async () => ({
+    content: [{ type: 'text', text: 'hi there' }],
   });
 
   createDiscordRuntime({
     client,
     token: 'token-123',
     channelId: 'root',
-    provider: 'test',
-    model: 'gpt-test',
-    providers: { test: providerFactory },
+    modelInstance,
+    completeSimple,
     sendMessage: (payload) => {
       sends.push(payload);
       return Promise.resolve();
@@ -73,20 +71,18 @@ test('createDiscordRuntime sends model reply via sendMessage', async () => {
 test('createDiscordRuntime ignores empty messages', async () => {
   const client = new MockDiscordClient();
   let called = 0;
-  const providerFactory = () => ({
-    createChatCompletion: async () => {
-      called += 1;
-      return { text: 'ok' };
-    },
-  });
+  const modelInstance = { id: 'model-test' };
+  const completeSimple = async () => {
+    called += 1;
+    return { content: [{ type: 'text', text: 'ok' }] };
+  };
 
   createDiscordRuntime({
     client,
     token: 'token-123',
     channelId: 'root',
-    provider: 'test',
-    model: 'gpt-test',
-    providers: { test: providerFactory },
+    modelInstance,
+    completeSimple,
     sendMessage: () => Promise.resolve(),
   });
 
@@ -99,17 +95,15 @@ test('createDiscordRuntime ignores empty messages', async () => {
 test('createDiscordRuntime passes thread context to sendMessage', async () => {
   const client = new MockDiscordClient();
   const sends = [];
-  const providerFactory = () => ({
-    createChatCompletion: async () => ({ text: 'thread-reply' }),
-  });
+  const modelInstance = { id: 'model-test' };
+  const completeSimple = async () => ({ content: [{ type: 'text', text: 'thread-reply' }] });
 
   createDiscordRuntime({
     client,
     token: 'token-123',
     channelId: 'root',
-    provider: 'test',
-    model: 'gpt-test',
-    providers: { test: providerFactory },
+    modelInstance,
+    completeSimple,
     sendMessage: (payload) => {
       sends.push(payload);
       return Promise.resolve();

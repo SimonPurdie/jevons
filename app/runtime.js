@@ -1,5 +1,12 @@
 const { createDiscordBot } = require('./discord');
-const { createModelClient } = require('./model');
+
+function resolvePiAi() {
+  try {
+    return require('@mariozechner/pi-ai');
+  } catch (err) {
+    throw new Error('pi-ai is not installed; run npm install');
+  }
+}
 
 function extractReplyContent(response) {
   if (!response) {
@@ -14,6 +21,13 @@ function extractReplyContent(response) {
   if (response.message && typeof response.message.content === 'string') {
     return response.message.content;
   }
+  if (Array.isArray(response.content)) {
+    for (const block of response.content) {
+      if (block && block.type === 'text' && typeof block.text === 'string') {
+        return block.text;
+      }
+    }
+  }
   if (Array.isArray(response.choices)) {
     for (const choice of response.choices) {
       if (choice && choice.message && typeof choice.message.content === 'string') {
@@ -27,7 +41,7 @@ function extractReplyContent(response) {
   return null;
 }
 
-async function handleDiscordMessage(payload, modelClient, sendMessage) {
+async function handleDiscordMessage(payload, modelInstance, completeFn, sendMessage) {
   if (!payload || typeof payload.content !== 'string') {
     return;
   }
@@ -36,7 +50,7 @@ async function handleDiscordMessage(payload, modelClient, sendMessage) {
     return;
   }
 
-  const response = await modelClient.generateChatCompletion({
+  const response = await completeFn(modelInstance, {
     messages: [{ role: 'user', content: trimmed }],
   });
   const reply = extractReplyContent(response);
@@ -61,8 +75,9 @@ function createDiscordRuntime(options) {
     provider,
     model,
     providers,
-    providerOptions,
-    modelClient,
+    modelInstance,
+    getModel: getModelOverride,
+    completeSimple: completeSimpleOverride,
     sendMessage,
     onReady,
     onError,
@@ -72,12 +87,22 @@ function createDiscordRuntime(options) {
     throw new Error('sendMessage callback is required');
   }
 
-  const resolvedModelClient = modelClient || createModelClient({
-    provider,
-    model,
-    providers,
-    providerOptions,
-  });
+  if (!modelInstance && (!provider || !model)) {
+    throw new Error('model provider and model name are required');
+  }
+
+  let resolvedModel = modelInstance;
+  let completeFn = completeSimpleOverride;
+  if (!resolvedModel || !completeFn) {
+    const piAi = resolvePiAi();
+    const getModelFn = getModelOverride || piAi.getModel;
+    if (!resolvedModel) {
+      resolvedModel = getModelFn(provider, model, providers);
+    }
+    if (!completeFn) {
+      completeFn = piAi.completeSimple;
+    }
+  }
 
   const bot = createDiscordBot({
     client,
@@ -86,7 +111,7 @@ function createDiscordRuntime(options) {
     onReady,
     onError,
     onMessage: (payload) => {
-      handleDiscordMessage(payload, resolvedModelClient, sendMessage).catch((err) => {
+      handleDiscordMessage(payload, resolvedModel, completeFn, sendMessage).catch((err) => {
         if (typeof onError === 'function') {
           onError(err);
           return;
@@ -98,7 +123,7 @@ function createDiscordRuntime(options) {
 
   return {
     start: bot.start,
-    modelClient: resolvedModelClient,
+    model: resolvedModel,
   };
 }
 
