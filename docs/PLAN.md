@@ -27,7 +27,7 @@
 - [x] Implement event log writer (append-only markdown, per context window); add tests for format and immutability behavior.
 - [x] Implement log naming rules and path resolver; add tests for timestamp/seq uniqueness.
 - [x] Implement /new command to end a context window and reset per-window chat history; add tests around state reset.
-- [ ] Implement embedding generation (Google provider, async queue, retry/backoff); add tests for retry states and status transitions.
+- [x] Implement embedding generation (Google provider, async queue, retry/backoff); add tests for retry states and status transitions.
 - [ ] Implement SQLite embeddings index schema + CRUD; add tests for insert/query/migration.
 - [ ] Implement embedding reconciliation job (find missing embeddings, enqueue); add tests for coverage.
 - [ ] Implement memory retrieval (similarity + recency + MMR + pinned-first); add tests for ranking outcomes.
