@@ -26,6 +26,7 @@ function startDiscordRuntime() {
   const config = loadConfig();
   const modelConfig = config.model || {};
   const discordConfig = config.discord || {};
+  const memoryConfig = config.memory || {};
 
   if (!discordConfig.token) {
     throw new Error('Discord token missing in config');
@@ -45,6 +46,7 @@ function startDiscordRuntime() {
     channelId: discordConfig.channel_id,
     provider: modelConfig.provider,
     model: modelConfig.model,
+    logsRoot: memoryConfig.logs_root,
     sendMessage: (payload) => sendDiscordMessage(client, payload),
     onReady: () => {
       // eslint-disable-next-line no-console

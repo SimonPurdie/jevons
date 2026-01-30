@@ -1,4 +1,5 @@
 const { createDiscordBot } = require('./discord');
+const { createContextWindowResolver } = require('../memory/logs/logWriter');
 
 function resolvePiAi() {
   try {
@@ -81,10 +82,32 @@ function createDiscordRuntime(options) {
     sendMessage,
     onReady,
     onError,
+    logsRoot,
   } = options || {};
 
   if (typeof sendMessage !== 'function') {
     throw new Error('sendMessage callback is required');
+  }
+
+  // Set up context window resolver for logging if logsRoot is provided
+  const windowResolver = logsRoot ? createContextWindowResolver({ logsRoot }) : null;
+
+  function getSurfaceFromContext(contextId, threadId) {
+    return threadId ? 'discord-thread' : 'discord-channel';
+  }
+
+  function logEvent(payload, role, content, metadata) {
+    if (!windowResolver) {
+      return;
+    }
+    const surface = getSurfaceFromContext(payload.contextId, payload.threadId);
+    const window = windowResolver.getOrCreateContextWindow(surface, payload.contextId);
+    window.append({
+      timestamp: new Date().toISOString(),
+      role,
+      content,
+      metadata: metadata || undefined,
+    });
   }
 
   if (!modelInstance && (!provider || !model)) {
@@ -120,11 +143,22 @@ function createDiscordRuntime(options) {
     onError,
     onMessage: (payload) => {
       (async () => {
+        // Log user message
+        logEvent(payload, 'user', payload.content, {
+          authorId: payload.authorId,
+          messageId: payload.messageId,
+        });
+
         let reply;
         try {
           reply = await generateReply(payload, resolvedModel, completeFn);
         } catch (err) {
           const errorMessage = formatModelError(err);
+          // Log error as agent response with error metadata
+          logEvent(payload, 'agent', errorMessage, {
+            error: true,
+            errorType: 'model',
+          });
           try {
             await sendMessage({
               content: errorMessage,
@@ -148,6 +182,9 @@ function createDiscordRuntime(options) {
         if (!reply) {
           return;
         }
+
+        // Log agent reply before sending
+        logEvent(payload, 'agent', reply);
 
         try {
           await sendMessage({
