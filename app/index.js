@@ -1,6 +1,7 @@
 const { Client, GatewayIntentBits } = require('discord.js');
 const { loadConfig } = require('./config');
 const { createDiscordRuntime } = require('./runtime');
+const { createSchedulerService } = require('../scheduler/service');
 
 function createDiscordClient() {
   return new Client({
@@ -27,6 +28,7 @@ function startDiscordRuntime() {
   const modelConfig = config.model || {};
   const discordConfig = config.discord || {};
   const memoryConfig = config.memory || {};
+  const remindersConfig = config.reminders || {};
 
   if (!discordConfig.token) {
     throw new Error('Discord token missing in config');
@@ -39,6 +41,22 @@ function startDiscordRuntime() {
   }
 
   const client = createDiscordClient();
+  const sendMessage = (payload) => sendDiscordMessage(client, payload);
+
+  const scheduler = createSchedulerService({
+    remindersFilePath: remindersConfig.file_path,
+    sendMessage,
+    channelId: discordConfig.channel_id,
+    interval: 60000,
+    onError: (err) => {
+      // eslint-disable-next-line no-console
+      console.error('Scheduler error', err);
+    },
+    onLog: (msg) => {
+      // eslint-disable-next-line no-console
+      console.log(msg);
+    },
+  });
 
   const runtime = createDiscordRuntime({
     client,
@@ -50,10 +68,16 @@ function startDiscordRuntime() {
     memoryIndexPath: memoryConfig.index_path,
     embeddingApiKey: process.env.GEMINI_API_KEY,
     embeddingModel: memoryConfig.embedding_model,
-    sendMessage: (payload) => sendDiscordMessage(client, payload),
+    sendMessage,
     onReady: () => {
       // eslint-disable-next-line no-console
       console.log('Discord runtime ready');
+      if (remindersConfig.file_path) {
+        scheduler.start();
+      } else {
+        // eslint-disable-next-line no-console
+        console.warn('Reminders file path not configured, scheduler disabled');
+      }
     },
     onError: (err) => {
       // eslint-disable-next-line no-console
