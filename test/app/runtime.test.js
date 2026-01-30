@@ -68,6 +68,58 @@ test('createDiscordRuntime sends model reply via sendMessage', async () => {
   assert.equal(sends[0].channelId, 'root');
 });
 
+test('createDiscordRuntime sends API error message when model fails', async () => {
+  const client = new MockDiscordClient();
+  const sends = [];
+  const modelInstance = { id: 'model-test' };
+  const completeSimple = async () => {
+    throw new Error('No API key for provider: google');
+  };
+
+  createDiscordRuntime({
+    client,
+    token: 'token-123',
+    channelId: 'root',
+    modelInstance,
+    completeSimple,
+    sendMessage: (payload) => {
+      sends.push(payload);
+      return Promise.resolve();
+    },
+  });
+
+  client.emit('messageCreate', makeMessage({ channelId: 'root', content: 'Hello' }));
+  await flush();
+
+  assert.equal(sends.length, 1);
+  assert.equal(sends[0].content, 'API error: No API key for provider: google');
+});
+
+test('createDiscordRuntime sends API error when response is empty', async () => {
+  const client = new MockDiscordClient();
+  const sends = [];
+  const modelInstance = { id: 'model-test' };
+  const completeSimple = async () => ({ content: [] });
+
+  createDiscordRuntime({
+    client,
+    token: 'token-123',
+    channelId: 'root',
+    modelInstance,
+    completeSimple,
+    sendMessage: (payload) => {
+      sends.push(payload);
+      return Promise.resolve();
+    },
+  });
+
+  client.emit('messageCreate', makeMessage({ channelId: 'root', content: 'Hello' }));
+  await flush();
+
+  assert.equal(sends.length, 1);
+  assert.equal(sends[0].content, 'API error: Model response missing content');
+});
+
 test('createDiscordRuntime ignores empty messages', async () => {
   const client = new MockDiscordClient();
   let called = 0;

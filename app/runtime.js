@@ -41,13 +41,20 @@ function extractReplyContent(response) {
   return null;
 }
 
-async function handleDiscordMessage(payload, modelInstance, completeFn, sendMessage) {
+function formatModelError(err) {
+  if (err && typeof err.message === 'string' && err.message.trim()) {
+    return `API error: ${err.message}`;
+  }
+  return 'API error: request failed';
+}
+
+async function generateReply(payload, modelInstance, completeFn) {
   if (!payload || typeof payload.content !== 'string') {
-    return;
+    return null;
   }
   const trimmed = payload.content.trim();
   if (!trimmed) {
-    return;
+    return null;
   }
 
   const response = await completeFn(modelInstance, {
@@ -57,14 +64,7 @@ async function handleDiscordMessage(payload, modelInstance, completeFn, sendMess
   if (!reply || !reply.trim()) {
     throw new Error('Model response missing content');
   }
-  await sendMessage({
-    content: reply,
-    channelId: payload.channelId,
-    threadId: payload.threadId,
-    contextId: payload.contextId,
-    messageId: payload.messageId,
-    authorId: payload.authorId,
-  });
+  return reply;
 }
 
 function createDiscordRuntime(options) {
@@ -119,13 +119,53 @@ function createDiscordRuntime(options) {
     onReady,
     onError,
     onMessage: (payload) => {
-      handleDiscordMessage(payload, resolvedModel, completeFn, sendMessage).catch((err) => {
-        if (typeof onError === 'function') {
-          onError(err);
+      (async () => {
+        let reply;
+        try {
+          reply = await generateReply(payload, resolvedModel, completeFn);
+        } catch (err) {
+          const errorMessage = formatModelError(err);
+          try {
+            await sendMessage({
+              content: errorMessage,
+              channelId: payload.channelId,
+              threadId: payload.threadId,
+              contextId: payload.contextId,
+              messageId: payload.messageId,
+              authorId: payload.authorId,
+            });
+          } catch (sendErr) {
+            if (typeof onError === 'function') {
+              onError(sendErr);
+            }
+          }
+          if (typeof onError === 'function') {
+            onError(err);
+          }
           return;
         }
-        throw err;
-      });
+
+        if (!reply) {
+          return;
+        }
+
+        try {
+          await sendMessage({
+            content: reply,
+            channelId: payload.channelId,
+            threadId: payload.threadId,
+            contextId: payload.contextId,
+            messageId: payload.messageId,
+            authorId: payload.authorId,
+          });
+        } catch (err) {
+          if (typeof onError === 'function') {
+            onError(err);
+            return;
+          }
+          throw err;
+        }
+      })();
     },
   });
 
@@ -138,5 +178,6 @@ function createDiscordRuntime(options) {
 module.exports = {
   createDiscordRuntime,
   extractReplyContent,
-  handleDiscordMessage,
+  generateReply,
+  formatModelError,
 };
