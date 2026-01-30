@@ -54,7 +54,7 @@
 
 --- Cross-cutting
 
-- [ ] Add basic observability (structured logs, error reporting); add tests for log emission paths.
+- [x] Add basic observability (structured logs, error reporting); add tests for log emission paths.
 
 
 ## Issue Tracker:

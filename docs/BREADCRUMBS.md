@@ -19,3 +19,9 @@ When using `generateEmbedding(dimensions, seed)` test helper:
 
 - Tests use Node.js built-in test runner: `npm test` or `node --test`
 - All tests in `/test/**/*.test.js` pattern are discovered automatically
+
+## Application Entry Point Testing
+
+- `app/index.js` exports `startDiscordRuntime` which now accepts an optional `deps` object for dependency injection.
+- This allows testing the bootstrap logic by injecting mocks for `config`, `runtime`, `scheduler`, and `discord.js`.
+- See `test/app/logging_integration.test.js` for an example of how to test the application entry point.

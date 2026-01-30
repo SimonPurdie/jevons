@@ -2,6 +2,7 @@ const { Client, GatewayIntentBits } = require('discord.js');
 const { loadConfig } = require('./config');
 const { createDiscordRuntime } = require('./runtime');
 const { createSchedulerService } = require('../scheduler/service');
+const logger = require('./logger');
 
 function createDiscordClient() {
   return new Client({
@@ -23,8 +24,13 @@ async function sendDiscordMessage(client, payload) {
   await channel.send(content);
 }
 
-function startDiscordRuntime() {
-  const config = loadConfig();
+function startDiscordRuntime(deps = {}) {
+  const _loadConfig = deps.loadConfig || loadConfig;
+  const _createDiscordRuntime = deps.createDiscordRuntime || createDiscordRuntime;
+  const _createSchedulerService = deps.createSchedulerService || createSchedulerService;
+  const _createDiscordClient = deps.createDiscordClient || createDiscordClient;
+
+  const config = _loadConfig();
   const modelConfig = config.model || {};
   const discordConfig = config.discord || {};
   const memoryConfig = config.memory || {};
@@ -40,25 +46,23 @@ function startDiscordRuntime() {
     throw new Error('Model provider and model name must be configured');
   }
 
-  const client = createDiscordClient();
+  const client = _createDiscordClient();
   const sendMessage = (payload) => sendDiscordMessage(client, payload);
 
-  const scheduler = createSchedulerService({
+  const scheduler = _createSchedulerService({
     remindersFilePath: remindersConfig.file_path,
     sendMessage,
     channelId: discordConfig.channel_id,
     interval: 60000,
     onError: (err) => {
-      // eslint-disable-next-line no-console
-      console.error('Scheduler error', err);
+      logger.error('Scheduler error', err);
     },
     onLog: (msg) => {
-      // eslint-disable-next-line no-console
-      console.log(msg);
+      logger.info(msg, { source: 'scheduler' });
     },
   });
 
-  const runtime = createDiscordRuntime({
+  const runtime = _createDiscordRuntime({
     client,
     token: discordConfig.token,
     channelId: discordConfig.channel_id,
@@ -70,18 +74,15 @@ function startDiscordRuntime() {
     embeddingModel: memoryConfig.embedding_model,
     sendMessage,
     onReady: () => {
-      // eslint-disable-next-line no-console
-      console.log('Discord runtime ready');
+      logger.info('Discord runtime ready');
       if (remindersConfig.file_path) {
         scheduler.start();
       } else {
-        // eslint-disable-next-line no-console
-        console.warn('Reminders file path not configured, scheduler disabled');
+        logger.warn('Reminders file path not configured, scheduler disabled');
       }
     },
     onError: (err) => {
-      // eslint-disable-next-line no-console
-      console.error('Discord runtime error', err);
+      logger.error('Discord runtime error', err);
     },
   });
 
@@ -94,8 +95,7 @@ module.exports = {
 
 if (require.main === module) {
   startDiscordRuntime().catch((err) => {
-    // eslint-disable-next-line no-console
-    console.error('Failed to start Discord runtime', err);
+    logger.error('Failed to start Discord runtime', err);
     process.exitCode = 1;
   });
 }
