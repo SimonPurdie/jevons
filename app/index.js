@@ -47,6 +47,9 @@ function startDiscordRuntime() {
     provider: modelConfig.provider,
     model: modelConfig.model,
     logsRoot: memoryConfig.logs_root,
+    memoryIndexPath: memoryConfig.index_path,
+    embeddingApiKey: process.env.GEMINI_API_KEY,
+    embeddingModel: memoryConfig.embedding_model,
     sendMessage: (payload) => sendDiscordMessage(client, payload),
     onReady: () => {
       // eslint-disable-next-line no-console

@@ -31,7 +31,7 @@
 - [x] Implement SQLite embeddings index schema + CRUD; add tests for insert/query/migration.
 - [x] Implement embedding reconciliation job (find missing embeddings, enqueue); add tests for coverage.
 - [x] Implement memory retrieval (similarity + recency + MMR + pinned-first); add tests for ranking outcomes.
-- [ ] Implement memory injection (JSON schema + token heuristics, injected-before-prompt); add tests for truncation and budgets.
+- [x] Implement memory injection (JSON schema + token heuristics, injected-before-prompt); add tests for truncation and budgets.
 
 --- Tracer B: memory UX expansion
 

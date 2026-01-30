@@ -1,5 +1,9 @@
 const { createDiscordBot } = require('./discord');
 const { createContextWindowResolver } = require('../memory/logs/logWriter');
+const { formatMemoryInjection } = require('../memory/index/injection');
+const { retrieveMemories } = require('../memory/index/retrieval');
+const { generateEmbedding } = require('../memory/index/embeddings');
+const { readLogEntry } = require('../memory/logs/logReader');
 
 function resolvePiAi() {
   try {
@@ -49,7 +53,7 @@ function formatModelError(err) {
   return 'API error: request failed';
 }
 
-async function generateReply(payload, modelInstance, completeFn) {
+async function generateReply(payload, modelInstance, completeFn, options = {}) {
   if (!payload || typeof payload.content !== 'string') {
     return null;
   }
@@ -58,14 +62,81 @@ async function generateReply(payload, modelInstance, completeFn) {
     return null;
   }
 
+  let content = trimmed;
+  const injectionFn = options.injection;
+  if (typeof injectionFn === 'function') {
+    const injected = await injectionFn(trimmed, payload);
+    if (injected) {
+      content = `${injected}\n${trimmed}`;
+    }
+  }
+
   const response = await completeFn(modelInstance, {
-    messages: [{ role: 'user', content: trimmed }],
+    messages: [{ role: 'user', content }],
   });
   const reply = extractReplyContent(response);
   if (!reply || !reply.trim()) {
     throw new Error('Model response missing content');
   }
   return reply;
+}
+
+function createMemoryInjectionProvider(options = {}) {
+  const {
+    indexPath,
+    embeddingApiKey,
+    embeddingModel,
+    embedder,
+    retriever,
+    logReader,
+    injectorOptions,
+    maxMemories,
+    onError,
+  } = options;
+
+  const canEmbed = typeof embedder === 'function' || embeddingApiKey;
+  const canRetrieve = typeof retriever === 'function' || indexPath;
+  if (!canEmbed || !canRetrieve) {
+    return null;
+  }
+
+  const embed = embedder || ((text) => generateEmbedding(text, {
+    apiKey: embeddingApiKey,
+    embeddingModel,
+  }));
+  const retrieve = retriever || ((embedding, retrieveOptions) => retrieveMemories(embedding, {
+    dbPath: indexPath,
+    ...retrieveOptions,
+  }));
+  const readEntry = logReader || ((path, line) => readLogEntry(path, line));
+
+  return async function getInjection(trimmed) {
+    try {
+      const queryEmbedding = await embed(trimmed);
+      const retrieved = await retrieve(queryEmbedding, { limit: maxMemories });
+      if (!retrieved || retrieved.length === 0) {
+        return null;
+      }
+
+      const hydrated = retrieved.map((memory) => {
+        if (memory && typeof memory.content === 'string') {
+          return memory;
+        }
+        const entry = readEntry(memory.path, memory.line);
+        return {
+          ...memory,
+          content: entry ? entry.content : '',
+        };
+      });
+
+      return formatMemoryInjection(hydrated, injectorOptions);
+    } catch (error) {
+      if (typeof onError === 'function') {
+        onError(error);
+      }
+      return null;
+    }
+  };
 }
 
 function createDiscordRuntime(options) {
@@ -83,6 +154,15 @@ function createDiscordRuntime(options) {
     onReady,
     onError,
     logsRoot,
+    memoryIndexPath,
+    memoryInjection,
+    memoryEmbedder,
+    memoryRetriever,
+    memoryLogReader,
+    memoryInjectorOptions,
+    memoryMaxMemories,
+    embeddingApiKey,
+    embeddingModel,
   } = options || {};
 
   if (typeof sendMessage !== 'function') {
@@ -113,6 +193,20 @@ function createDiscordRuntime(options) {
   if (!modelInstance && (!provider || !model)) {
     throw new Error('model provider and model name are required');
   }
+
+  const memoryInjectionProvider = typeof memoryInjection === 'function'
+    ? memoryInjection
+    : createMemoryInjectionProvider({
+      indexPath: memoryIndexPath,
+      embeddingApiKey,
+      embeddingModel,
+      embedder: memoryEmbedder,
+      retriever: memoryRetriever,
+      logReader: memoryLogReader,
+      injectorOptions: memoryInjectorOptions,
+      maxMemories: memoryMaxMemories,
+      onError,
+    });
 
   let resolvedModel = modelInstance;
   let completeFn = completeSimpleOverride;
@@ -178,7 +272,9 @@ function createDiscordRuntime(options) {
 
         let reply;
         try {
-          reply = await generateReply(payload, resolvedModel, completeFn);
+          reply = await generateReply(payload, resolvedModel, completeFn, {
+            injection: memoryInjectionProvider,
+          });
         } catch (err) {
           const errorMessage = formatModelError(err);
           // Log error as agent response with error metadata

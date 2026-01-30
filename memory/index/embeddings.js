@@ -21,6 +21,44 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+async function generateEmbedding(text, options = {}) {
+  const config = { ...DEFAULT_CONFIG, ...options };
+  if (!config.apiKey) {
+    throw new Error('Google GenAI apiKey is required for embedding generation.');
+  }
+  const genAI = new GoogleGenAI({ apiKey: config.apiKey });
+  let attempt = 0;
+
+  while (attempt < config.maxRetries) {
+    try {
+      const result = await genAI.models.embedContent({
+        model: config.embeddingModel,
+        contents: text,
+      });
+
+      if (!result || !result.embeddings || !result.embeddings.length) {
+        throw new Error('No embedding returned from API');
+      }
+
+      return result.embeddings[0].values;
+    } catch (error) {
+      attempt += 1;
+      if (attempt >= config.maxRetries) {
+        throw error;
+      }
+      const delay = calculateBackoff(
+        attempt - 1,
+        config.baseDelayMs,
+        config.maxDelayMs,
+        config.backoffMultiplier
+      );
+      await sleep(delay);
+    }
+  }
+
+  throw new Error('Failed to generate embedding.');
+}
+
 class EmbeddingQueue {
   constructor(options = {}) {
     this.config = { ...DEFAULT_CONFIG, ...options };
@@ -200,5 +238,6 @@ module.exports = {
   createEmbeddingQueue,
   calculateBackoff,
   generateId,
+  generateEmbedding,
   DEFAULT_CONFIG,
 };

@@ -218,6 +218,48 @@ test('createDiscordRuntime logs user messages and agent replies', async () => {
   }
 });
 
+test('createDiscordRuntime injects memories before user prompt', async () => {
+  const client = new MockDiscordClient();
+  const sends = [];
+  let receivedContent = null;
+  const injection = 'INJECTED_CONTEXT_RELEVANT_MEMORIES\n{"budget_tokens_est":1,"memories":[]}';
+  const modelInstance = { id: 'model-test' };
+  const completeSimple = async (model, request) => {
+    receivedContent = request.messages[0].content;
+    return { content: [{ type: 'text', text: 'Hello user' }] };
+  };
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jevons-runtime-test-'));
+
+  try {
+    createDiscordRuntime({
+      client,
+      token: 'token-123',
+      channelId: 'root',
+      modelInstance,
+      completeSimple,
+      logsRoot: tempDir,
+      memoryInjection: async () => injection,
+      sendMessage: (payload) => {
+        sends.push(payload);
+        return Promise.resolve();
+      },
+    });
+
+    client.emit('messageCreate', makeMessage({ channelId: 'root', content: 'Hello bot' }));
+    await flush();
+
+    assert.ok(receivedContent.startsWith(injection));
+    assert.ok(receivedContent.endsWith('Hello bot'));
+
+    const logsDir = path.join(tempDir, 'logs', 'discord-channel', 'root');
+    const files = fs.readdirSync(logsDir);
+    const logContent = fs.readFileSync(path.join(logsDir, files[0]), 'utf8');
+    assert.ok(!logContent.includes('INJECTED_CONTEXT_RELEVANT_MEMORIES'));
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test('createDiscordRuntime logs errors when model fails', async () => {
   const client = new MockDiscordClient();
   const sends = [];
