@@ -24,8 +24,8 @@
 
 - [x] Implement model serving (pi-mono provider integration, provider-agnostic calls); add tests/mocks for provider selection and request shape.
 - [x] Wire Discord runtime to model client and send replies; add tests for reply flow.
-- [x] Implement event log writer (append-only markdown, per context window); add tests for format and immutability behavior.
-- [x] Implement log naming rules and path resolver; add tests for timestamp/seq uniqueness.
+- [ ] Implement event log writer (append-only markdown, per context window); add tests for format and immutability behavior.
+- [ ] Implement log naming rules and path resolver; add tests for timestamp/seq uniqueness.
 - [ ] Implement /new command to end a context window and reset per-window chat history; add tests around state reset.
 - [ ] Implement embedding generation (Google provider, async queue, retry/backoff); add tests for retry states and status transitions.
 - [ ] Implement SQLite embeddings index schema + CRUD; add tests for insert/query/migration.
