@@ -40,7 +40,7 @@
 
 - [x] Implement pinned memory flow (/remember command + storage + retrieval boost); add tests for precedence.
 - [x] Implement skills loader + execution via bash; add tests for script invocation and error handling.
-- [ ] Implement minimal CLI harness (stateless, no history); add tests for parity with Discord core behaviors.
+- [x] Implement minimal CLI harness (stateless, no history); add tests for parity with Discord core behaviors.
 
 --- Tracer C: reminders and scheduler
 
