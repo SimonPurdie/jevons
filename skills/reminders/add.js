@@ -26,11 +26,6 @@ if (!date || !time || !recur || msg === undefined) {
   process.exit(1);
 }
 
-if (!date || !time || !recur || msg === undefined) {
-  console.error('Usage: node add.js <date> <time> <recur> <msg>');
-  process.exit(1);
-}
-
 // Validation
 if (!DATE_PATTERN.test(date)) {
   console.error(`Error: Invalid date format: ${date}. Use YYYY-MM-DD`);
