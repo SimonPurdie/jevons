@@ -270,6 +270,30 @@ function buildSystemPrompt(skills, workspaceFilesContent) {
   return sections.join('\n\n');
 }
 
+/**
+ * Formats current system time for injection.
+ * Format: <Current Time: YYYY-MM-DD HH:mm:ss weekday timeOfDay>
+ */
+function formatCurrentTime(date = new Date()) {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  const hh = String(date.getHours()).padStart(2, '0');
+  const min = String(date.getMinutes()).padStart(2, '0');
+  const ss = String(date.getSeconds()).padStart(2, '0');
+  
+  const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const weekday = weekdays[date.getDay()];
+  
+  const hour = date.getHours();
+  let timeOfDay = 'night';
+  if (hour >= 5 && hour < 12) timeOfDay = 'morning';
+  else if (hour >= 12 && hour < 17) timeOfDay = 'afternoon';
+  else if (hour >= 17 && hour < 21) timeOfDay = 'evening';
+  
+  return `<Current Time: ${yyyy}-${mm}-${dd} ${hh}:${min}:${ss} ${weekday} ${timeOfDay}>`;
+}
+
 function normalizeHistoryMessages(history, modelInstance) {
   if (!Array.isArray(history)) {
     return [];
@@ -306,8 +330,14 @@ async function generateReply(payload, modelInstance, completeFn, options = {}) {
     const injected = await injectionFn(trimmed, payload);
     if (injected) {
       injectionText = injected;
-      content = `${injected}\n${trimmed}`;
     }
+  }
+
+  const timeInjection = formatCurrentTime();
+  if (injectionText) {
+    content = `${injectionText}\n${timeInjection}\n${trimmed}`;
+  } else {
+    content = `${timeInjection}\n${trimmed}`;
   }
 
   const { Agent } = await resolvePiAgentCore();
