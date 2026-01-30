@@ -33,3 +33,8 @@
 - [ ] Implement reminder lifecycle actions (one-off delete, recurring keep); add tests for file edits.
 - [ ] Implement Discord reminder notifications + confirmation messages; add tests/mocks for output format.
 - [ ] Add basic observability (structured logs, error reporting); add tests for log emission paths.
+
+
+## Issue Tracker:
+
+- List any issues you encounter here.
