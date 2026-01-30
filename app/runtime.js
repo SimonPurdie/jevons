@@ -135,6 +135,10 @@ function createDiscordRuntime(options) {
     }
   }
 
+  function isNewCommand(content) {
+    return typeof content === 'string' && content.trim() === '/new';
+  }
+
   const bot = createDiscordBot({
     client,
     token,
@@ -143,6 +147,29 @@ function createDiscordRuntime(options) {
     onError,
     onMessage: (payload) => {
       (async () => {
+        // Handle /new command: reset context window and confirm
+        if (isNewCommand(payload.content)) {
+          if (windowResolver) {
+            const surface = getSurfaceFromContext(payload.contextId, payload.threadId);
+            windowResolver.resetContextWindow(surface, payload.contextId);
+          }
+          try {
+            await sendMessage({
+              content: 'Context window reset. Starting fresh conversation.',
+              channelId: payload.channelId,
+              threadId: payload.threadId,
+              contextId: payload.contextId,
+              messageId: payload.messageId,
+              authorId: payload.authorId,
+            });
+          } catch (err) {
+            if (typeof onError === 'function') {
+              onError(err);
+            }
+          }
+          return;
+        }
+
         // Log user message
         logEvent(payload, 'user', payload.content, {
           authorId: payload.authorId,
