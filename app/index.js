@@ -61,7 +61,6 @@ function startDiscordRuntime() {
 
 module.exports = {
   startDiscordRuntime,
-  buildProviderOptions,
 };
 
 if (require.main === module) {
