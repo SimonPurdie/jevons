@@ -4,7 +4,7 @@ Configuration is loaded from an optional JSON file and environment variables.
 
 Loading order (lowest to highest priority):
 1. `config/jevons.config.json` (optional, ignored if missing)
-2. `config/.env` (optional; KEY=VALUE format)
+2. `config/.env` (optional; KEY=VALUE format, recommended for secrets only)
 3. Environment variables with `JEVONS_` prefix
 
 Notes:
