@@ -231,12 +231,43 @@ function extractLatestAssistantText(messages) {
   return null;
 }
 
-function buildSystemPrompt(skills) {
-  if (!skills || skills.length === 0) {
-    return '';
+/**
+ * Reads specified workspace files and formats them for injection.
+ * 
+ * @param {string[]} fileNames - List of file names to read.
+ * @param {string} baseDir - Directory where files are located.
+ * @returns {string} Formatted content string.
+ */
+function readWorkspaceFiles(fileNames, baseDir) {
+  let content = '';
+  for (const fileName of fileNames) {
+    const filePath = path.join(baseDir, fileName);
+    try {
+      if (fs.existsSync(filePath)) {
+        const fileContent = fs.readFileSync(filePath, 'utf8');
+        content += `\n---\nPath: ${filePath}\n\n${fileContent}\n`;
+      }
+    } catch (err) {
+      // Silently skip files that cannot be read
+    }
   }
-  const skillsContent = skills.map((skill) => skill.content).join('\n\n');
-  return `You have access to the following skills:\n\n${skillsContent}\n\nUse the bash tool to execute these skills when needed.`;
+  return content;
+}
+
+function buildSystemPrompt(skills, workspaceFilesContent) {
+  let sections = [];
+  
+  if (skills && skills.length > 0) {
+    const skillsContent = skills.map((skill) => skill.content).join('\n\n');
+    sections.push(`You have access to the following skills:\n\n${skillsContent}\n\nUse the bash tool to execute these skills when needed.`);
+  }
+  
+  if (workspaceFilesContent) {
+    const header = `- **Workspace Files (injected)**: AGENTS.md SOUL.md TOOLS.md IDENTITY.md USER.md ( all located in /home/simon/jevons and labelled with their full path and filename before their content )`;
+    sections.push(`${header}\n${workspaceFilesContent}`);
+  }
+  
+  return sections.join('\n\n');
 }
 
 function normalizeHistoryMessages(history, modelInstance) {
@@ -281,7 +312,9 @@ async function generateReply(payload, modelInstance, completeFn, options = {}) {
 
   const { Agent } = await resolvePiAgentCore();
 
-  const systemPrompt = buildSystemPrompt(options.skills);
+  const workspaceFileNames = ['AGENTS.md', 'SOUL.md', 'TOOLS.md', 'IDENTITY.md', 'USER.md'];
+  const workspaceFilesContent = readWorkspaceFiles(workspaceFileNames, '/home/simon/jevons');
+  const systemPrompt = buildSystemPrompt(options.skills, workspaceFilesContent);
   const historyMessages = normalizeHistoryMessages(options.chatHistory || [], modelInstance);
 
   const agent = new Agent({
