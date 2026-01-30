@@ -55,9 +55,10 @@ test('loadConfig reads config/.env file when present', () => {
   const dir = makeTempDir();
   writeConfig(dir, {});
   const envPath = path.join(dir, 'config', '.env');
-  fs.writeFileSync(envPath, 'JEVONS_MODEL_NAME=gemini-3-flash-preview\n');
+  fs.writeFileSync(envPath, 'JEVONS_MODEL_NAME=gemini-3-flash-preview\nJEVONS_GOOGLE_API_KEY=key-123\n');
   const config = loadConfig({ cwd: dir, env: {} });
   assert.equal(config.model.model, 'gemini-3-flash-preview');
+  assert.equal(config.model.google_api_key, 'key-123');
 });
 
 test('loadConfig prefers process env over config/.env file', () => {

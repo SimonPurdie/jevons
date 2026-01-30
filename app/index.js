@@ -4,8 +4,8 @@ const { createDiscordRuntime } = require('./runtime');
 
 function buildProviderOptions(modelConfig) {
   const options = { ...(modelConfig.options || {}) };
-  if (modelConfig.api_key && options.apiKey === undefined) {
-    options.apiKey = modelConfig.api_key;
+  if (modelConfig.google_api_key && options.apiKey === undefined) {
+    options.apiKey = modelConfig.google_api_key;
   }
   return options;
 }

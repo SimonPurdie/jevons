@@ -6,7 +6,7 @@ const ENV_MAP = {
   JEVONS_DISCORD_CHANNEL_ID: ['discord', 'channel_id'],
   JEVONS_MODEL_PROVIDER: ['model', 'provider'],
   JEVONS_MODEL_NAME: ['model', 'model'],
-  JEVONS_MODEL_API_KEY: ['model', 'api_key'],
+  JEVONS_GOOGLE_API_KEY: ['model', 'google_api_key'],
   JEVONS_MEMORY_LOGS_ROOT: ['memory', 'logs_root'],
   JEVONS_MEMORY_INDEX_PATH: ['memory', 'index_path'],
   JEVONS_MEMORY_PINS_PATH: ['memory', 'pins_path'],
