@@ -462,6 +462,7 @@ function createDiscordRuntime(options) {
     embeddingModel,
     skillsDir,
     skillPlaceholders = {},
+    ipcPort,
   } = options || {};
 
   if (typeof sendMessage !== 'function') {
@@ -479,8 +480,6 @@ function createDiscordRuntime(options) {
       }
     }
   }
-
-  const runtimeTools = [createBashTool(process.cwd())];
 
   // Set up context window resolver for logging if logsRoot is provided
   const windowResolver = logsRoot ? createContextWindowResolver({ logsRoot }) : null;
@@ -662,6 +661,14 @@ function createDiscordRuntime(options) {
           authorId: payload.authorId,
           messageId: payload.messageId,
         });
+
+        // Create tools with per-message IPC context
+        const extraEnv = {
+          JEVONS_IPC_PORT: ipcPort,
+          JEVONS_CHANNEL_ID: payload.channelId,
+          JEVONS_THREAD_ID: payload.threadId,
+        };
+        const runtimeTools = [createBashTool(process.cwd(), extraEnv)];
 
         let reply;
         try {

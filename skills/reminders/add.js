@@ -10,6 +10,7 @@ const {
 } = require('../../scheduler/parser');
 
 const { loadConfig } = require('../../app/config');
+const { sendIpcMessage } = require('../../lib/ipc-client');
 
 const config = loadConfig({ cwd: path.join(__dirname, '../../') });
 const filePath = config.reminders?.file_path;
@@ -51,20 +52,34 @@ if (!VALID_RECURRENCE.includes(recur)) {
 const id = generateReminderId();
 const line = formatReminderLine({ date, time, recur, msg, id });
 
-try {
-  // Read existing content to ensure we add a newline if needed
-  let existing = '';
-  if (fs.existsSync(filePath)) {
-    existing = fs.readFileSync(filePath, 'utf8');
+async function run() {
+  try {
+    // Read existing content to ensure we add a newline if needed
+    let existing = '';
+    if (fs.existsSync(filePath)) {
+      existing = fs.readFileSync(filePath, 'utf8');
+    }
+    
+    const separator = (existing && !existing.endsWith('\n')) ? '\n' : '';
+    fs.appendFileSync(filePath, separator + line + '\n');
+    
+    const recurPart = recur !== 'none' ? ` (recurring: ${recur})` : '';
+    const confirmation = `Set reminder: ${msg} at ${time} on ${date}${recurPart}`;
+    
+    // Try to send via IPC
+    const sent = await sendIpcMessage(confirmation);
+    
+    if (sent) {
+      process.stdout.write(`SUCCESS: Message sent to Discord: ${confirmation}\n`);
+    } else {
+      process.stdout.write(`${confirmation}\n`);
+    }
+    process.stderr.write(`ID: ${id}\n`);
+  } catch (err) {
+    console.error(`Error writing to file: ${err.message}`);
+    process.exit(1);
   }
-  
-  const separator = (existing && !existing.endsWith('\n')) ? '\n' : '';
-  fs.appendFileSync(filePath, separator + line + '\n');
-  
-  const recurPart = recur !== 'none' ? ` (recurring: ${recur})` : '';
-  process.stdout.write(`Set reminder: ${msg} at ${time} on ${date}${recurPart}\n`);
-  process.stderr.write(`ID: ${id}\n`);
-} catch (err) {
-  console.error(`Error writing to file: ${err.message}`);
-  process.exit(1);
 }
+
+run();
+

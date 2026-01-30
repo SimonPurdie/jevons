@@ -33,7 +33,7 @@ function truncateOutput(output) {
   return { text: text || '(no output)', truncated };
 }
 
-function createBashTool(cwd) {
+function createBashTool(cwd, extraEnv = {}) {
   return {
     name: 'bash',
     label: 'bash',
@@ -56,7 +56,7 @@ function createBashTool(cwd) {
 
         const child = spawn('bash', ['-lc', command], {
           cwd,
-          env: process.env,
+          env: { ...process.env, ...extraEnv },
           stdio: ['ignore', 'pipe', 'pipe'],
         });
 

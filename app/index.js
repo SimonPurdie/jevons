@@ -2,6 +2,7 @@ const { Client, GatewayIntentBits } = require('discord.js');
 const { loadConfig } = require('./config');
 const { createDiscordRuntime } = require('./runtime');
 const { createSchedulerService } = require('../scheduler/service');
+const { createIpcServer } = require('./ipc');
 const logger = require('./logger');
 
 function createDiscordClient() {
@@ -24,7 +25,7 @@ async function sendDiscordMessage(client, payload) {
   await channel.send(content);
 }
 
-function startDiscordRuntime(deps = {}) {
+async function startDiscordRuntime(deps = {}) {
   const _loadConfig = deps.loadConfig || loadConfig;
   const _createDiscordRuntime = deps.createDiscordRuntime || createDiscordRuntime;
   const _createSchedulerService = deps.createSchedulerService || createSchedulerService;
@@ -48,6 +49,11 @@ function startDiscordRuntime(deps = {}) {
 
   const client = _createDiscordClient();
   const sendMessage = (payload) => sendDiscordMessage(client, payload);
+
+  // Start IPC server
+  const ipcServer = createIpcServer({ sendMessage, logger });
+  const ipcPort = await ipcServer.start();
+  logger.info(`IPC server listening on port ${ipcPort}`);
 
   const scheduler = _createSchedulerService({
     remindersFilePath: remindersConfig.file_path,
@@ -76,6 +82,7 @@ function startDiscordRuntime(deps = {}) {
     embeddingModel: memoryConfig.embedding_model,
     skillsDir: require('path').join(__dirname, '../skills'),
     sendMessage,
+    ipcPort,
     onReady: () => {
       logger.info('Discord runtime ready');
       if (remindersConfig.file_path) {
