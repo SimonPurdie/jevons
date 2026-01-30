@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { EventEmitter } = require('events');
-const { createDiscordRuntime } = require('./runtime');
+const { createDiscordRuntime } = require('../../app/runtime');
 
 class MockDiscordClient extends EventEmitter {
   constructor() {

@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { loadConfig } = require('./config');
+const { loadConfig } = require('../../app/config');
 
 function makeTempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'jevons-config-'));

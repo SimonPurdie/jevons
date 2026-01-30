@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { createModelClient, buildChatRequest, resolveProviderFactory } = require('./model');
+const { createModelClient, buildChatRequest, resolveProviderFactory } = require('../../app/model');
 
 test('buildChatRequest includes model and messages', () => {
   const request = buildChatRequest('gpt-test', {
