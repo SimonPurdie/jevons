@@ -22,11 +22,11 @@ try {
   const reminders = parseRemindersFile(content);
 
   if (reminders.length === 0) {
-    console.log('No valid reminders found.');
+    process.stdout.write('No valid reminders found.\n');
   } else {
     reminders.forEach(r => {
-      const recurPart = r.recur !== 'none' ? ` [${r.recur}]` : '';
-      console.log(`${r.id}: ${r.date} ${r.time}${recurPart} - ${r.msg}`);
+      const recurPart = r.recur !== 'none' ? ` (recurring: ${r.recur})` : '';
+      process.stdout.write(`${r.id}: ${r.msg} at ${r.time} on ${r.date}${recurPart}\n`);
     });
   }
 } catch (err) {

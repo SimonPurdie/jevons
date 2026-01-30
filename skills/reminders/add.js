@@ -61,9 +61,9 @@ try {
   const separator = (existing && !existing.endsWith('\n')) ? '\n' : '';
   fs.appendFileSync(filePath, separator + line + '\n');
   
-  const recurSuffix = recur !== 'none' ? ` (${recur})` : '';
-  console.log(`Confirmed: Reminder set for ${date} at ${time}${recurSuffix}: ${msg}`);
-  console.log(`ID: ${id}`);
+  const recurPart = recur !== 'none' ? ` (recurring: ${recur})` : '';
+  process.stdout.write(`Set reminder: ${msg} at ${time} on ${date}${recurPart}\n`);
+  process.stderr.write(`ID: ${id}\n`);
 } catch (err) {
   console.error(`Error writing to file: ${err.message}`);
   process.exit(1);

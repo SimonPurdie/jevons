@@ -44,7 +44,7 @@ try {
   }
 
   fs.writeFileSync(filePath, updatedLines.join('\n'), 'utf8');
-  console.log(`Confirmed: Deleted reminder ${id}`);
+  process.stdout.write(`Deleted reminder: ${id}\n`);
 } catch (err) {
   console.error(`Error processing file: ${err.message}`);
   process.exit(1);

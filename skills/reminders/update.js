@@ -73,8 +73,9 @@ try {
 
   fs.writeFileSync(filePath, updatedLines.join('\n'), 'utf8');
   
-  const recurSuffix = recur !== 'none' ? ` (${recur})` : '';
-  console.log(`Confirmed: Updated reminder ${id} to ${date} at ${time}${recurSuffix}: ${msg}`);
+  const recurPart = recur !== 'none' ? ` (recurring: ${recur})` : '';
+  process.stdout.write(`Updated reminder: ${msg} at ${time} on ${date}${recurPart}\n`);
+  process.stderr.write(`ID: ${id}\n`);
 } catch (err) {
   console.error(`Error processing file: ${err.message}`);
   process.exit(1);

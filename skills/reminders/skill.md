@@ -37,4 +37,6 @@ Example: `node skills/reminders/delete.js rid_K5V4M2J9Q2ZP`
 - All times are **Europe/London**.
 - The scheduler scans the file once per minute.
 - One-off reminders (`recur=none`) are automatically deleted after firing.
-- Confirm the action taken to the user by repeating the script's confirmation message.
+- **Confirmation:** The helper scripts output a clean confirmation message on the first line of their output. Repeat this line exactly to the user on Discord.
+- **IDs:** The second line of output contains the reminder ID (e.g., `ID: rid_...`). Keep this for your internal memory/context so you can manage the reminder later, but **do not include it** in your message to the user.
+- **Recurrence:** The word "recurring" is only included in the output if the reminder is not a one-off.
