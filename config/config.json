@@ -7,9 +7,9 @@
     "model": "gemini-3-flash-preview"
   },
   "memory": {
-    "logs_root": "memory/logs",
-    "index_path": "memory/index/embeddings.sqlite3",
-    "pins_path": "memory/pins"
+    "logs_root": "data",
+    "index_path": "data/index/embeddings.sqlite3",
+    "pins_path": "data/pins"
   },
   "reminders": {
     "file_path": "/mnt/f/Obsidian-Vaults/Simon/Reminders.md",

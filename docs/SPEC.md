@@ -457,7 +457,7 @@ Invalid lines are ignored by the scheduler and must not be modified automaticall
 
 ## 9. Open items / TBD
 
-- File layout (logs root, embeddings index path, reminders file path) to be finalized after the spec stabilizes.
+- None.
 
 ---
 
@@ -469,17 +469,20 @@ This is a lightweight sketch to aid implementation; paths may change as requirem
 .
 ├─ app/                     # agent runtime + discord integration
 ├─ cli/                     # minimal test CLI
+├─ data/                    # runtime data storage (ignored by git)
+│  ├─ logs/                 # append-only markdown logs
+│  ├─ index/                # embeddings index + metadata (SQLite)
+│  └─ pins/                 # pinned memory metadata
 ├─ skills/                  # skill content + helper scripts
-├─ memory/
-│  ├─ logs/                 # append-only markdown logs (final layout TBD)
-│  ├─ index/                # embeddings index + metadata (SQLite suggested)
-│  └─ pins/                 # optional pinned memory metadata
+├─ memory/                  # memory system implementation
+│  ├─ logs/                 # log writer/reader logic
+│  ├─ index/                # embeddings index logic
+│  └─ pins/                 # pins manager logic
 ├─ scheduler/               # reminder scanner + dispatcher
 ├─ config/                  # config templates / sample env files
 └─ docs/                    # internal docs and implementation notes
 ```
 
 Notes:
-- Exact paths for logs, embeddings, and reminders remain **TBD** and may move.
 - The Obsidian reminders file may live **outside** the repo; treat it as an external path.
     

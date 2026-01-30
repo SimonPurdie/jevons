@@ -25,3 +25,9 @@ When using `generateEmbedding(dimensions, seed)` test helper:
 - `app/index.js` exports `startDiscordRuntime` which now accepts an optional `deps` object for dependency injection.
 - This allows testing the bootstrap logic by injecting mocks for `config`, `runtime`, `scheduler`, and `discord.js`.
 - See `test/app/logging_integration.test.js` for an example of how to test the application entry point.
+
+## File Layout
+
+- Runtime data (logs, embeddings, pins) is stored in the `data/` directory, separate from the implementation code in `memory/`.
+- `config/config.json` points to `data/` for `logs_root`, `index_path`, and `pins_path`.
+- The `data/` directory is ignored by git.

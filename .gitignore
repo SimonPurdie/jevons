@@ -1,3 +1,7 @@
 node_modules
 config/.env
 .geoff/
+data/
+memory/index/*.sqlite3
+memory/logs/**/*.md
+memory/pins/*.json

@@ -56,6 +56,10 @@
 
 - [x] Add basic observability (structured logs, error reporting); add tests for log emission paths.
 
+--- Finalization
+
+- [x] Finalize file layout (move runtime data to `data/` dir); update config and spec.
+
 
 ## Issue Tracker:
 
