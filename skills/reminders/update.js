@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 const fs = require('fs');
+const path = require('path');
+const { loadConfig } = require('../../app/config');
 const { 
   parseReminderLine, 
   formatReminderLine, 
@@ -8,10 +10,18 @@ const {
   VALID_RECURRENCE 
 } = require('../../scheduler/parser');
 
-const [,, filePath, id, date, time, recur, msg] = process.argv;
+const config = loadConfig({ cwd: path.join(__dirname, '../../') });
+const filePath = config.reminders?.file_path;
 
-if (!filePath || !id || !date || !time || !recur || msg === undefined) {
-  console.error('Usage: node update.js <filePath> <id> <date> <time> <recur> <msg>');
+const [,, id, date, time, recur, msg] = process.argv;
+
+if (!filePath) {
+  console.error('Error: reminders.file_path not found in config.');
+  process.exit(1);
+}
+
+if (!id || !date || !time || !recur || msg === undefined) {
+  console.error('Usage: node update.js <id> <date> <time> <recur> <msg>');
   process.exit(1);
 }
 

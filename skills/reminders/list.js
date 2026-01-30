@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 const fs = require('fs');
+const path = require('path');
+const { loadConfig } = require('../../app/config');
 const { parseRemindersFile } = require('../../scheduler/parser');
 
-const [,, filePath] = process.argv;
+const config = loadConfig({ cwd: path.join(__dirname, '../../') });
+const filePath = config.reminders?.file_path;
 
 if (!filePath) {
-  console.error('Usage: node list.js <filePath>');
+  console.error('Error: reminders.file_path not found in config.');
   process.exit(1);
 }
 

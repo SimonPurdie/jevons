@@ -473,15 +473,6 @@ function createDiscordRuntime(options) {
   if (skillsDir) {
     try {
       loadedSkills = loadSkill({ skillsDir });
-      // Replace placeholders in skill content
-      loadedSkills = loadedSkills.map(skill => {
-        let content = skill.content || '';
-        for (const [key, value] of Object.entries(skillPlaceholders)) {
-          const placeholder = `{{${key}}}`;
-          content = content.split(placeholder).join(value || '');
-        }
-        return { ...skill, content };
-      });
     } catch (err) {
       if (typeof onError === 'function') {
         onError(new Error(`Failed to load skills: ${err.message}`));

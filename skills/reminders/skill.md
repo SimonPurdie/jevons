@@ -9,29 +9,29 @@ The canonical reminders file is at: `{{REMINDERS_FILE_PATH}}`
 
 ### 1. List Reminders
 Always start by listing reminders to see current state and IDs.
-`node skills/reminders/list.js {{REMINDERS_FILE_PATH}}`
+`node skills/reminders/list.js`
 
 ### 2. Add a Reminder
-`node skills/reminders/add.js {{REMINDERS_FILE_PATH}} <date> <time> <recur> "<message>"`
+`node skills/reminders/add.js <date> <time> <recur> "<message>"`
 
 - `date`: YYYY-MM-DD (e.g., 2026-02-15)
 - `time`: HH:MM (24h, e.g., 14:00)
 - `recur`: one of `none`, `daily`, `weekly`, `monthly`
 - `message`: Double-quoted string.
 
-Example: `node skills/reminders/add.js {{REMINDERS_FILE_PATH}} 2026-02-15 09:00 none "Buy groceries"`
+Example: `node skills/reminders/add.js 2026-02-15 09:00 none "Buy groceries"`
 
 ### 3. Update a Reminder
 Modify an existing reminder by its ID. You must provide ALL fields.
-`node skills/reminders/update.js {{REMINDERS_FILE_PATH}} <id> <date> <time> <recur> "<message>"`
+`node skills/reminders/update.js <id> <date> <time> <recur> "<message>"`
 
-Example: `node skills/reminders/update.js {{REMINDERS_FILE_PATH}} rid_K5V4M2J9Q2ZP 2026-02-15 10:00 none "Buy groceries and milk"`
+Example: `node skills/reminders/update.js rid_K5V4M2J9Q2ZP 2026-02-15 10:00 none "Buy groceries and milk"`
 
 ### 4. Delete a Reminder
 Remove a reminder by its ID.
-`node skills/reminders/delete.js {{REMINDERS_FILE_PATH}} <id>`
+`node skills/reminders/delete.js <id>`
 
-Example: `node skills/reminders/delete.js {{REMINDERS_FILE_PATH}} rid_K5V4M2J9Q2ZP`
+Example: `node skills/reminders/delete.js rid_K5V4M2J9Q2ZP`
 
 ## Important Notes
 - All times are **Europe/London**.

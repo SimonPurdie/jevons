@@ -1,11 +1,21 @@
 #!/usr/bin/env node
 const fs = require('fs');
+const path = require('path');
+const { loadConfig } = require('../../app/config');
 const { parseReminderLine } = require('../../scheduler/parser');
 
-const [,, filePath, id] = process.argv;
+const config = loadConfig({ cwd: path.join(__dirname, '../../') });
+const filePath = config.reminders?.file_path;
 
-if (!filePath || !id) {
-  console.error('Usage: node delete.js <filePath> <id>');
+const [,, id] = process.argv;
+
+if (!filePath) {
+  console.error('Error: reminders.file_path not found in config.');
+  process.exit(1);
+}
+
+if (!id) {
+  console.error('Usage: node delete.js <id>');
   process.exit(1);
 }
 

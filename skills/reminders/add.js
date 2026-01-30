@@ -9,10 +9,25 @@ const {
   VALID_RECURRENCE 
 } = require('../../scheduler/parser');
 
-const [,, filePath, date, time, recur, msg] = process.argv;
+const { loadConfig } = require('../../app/config');
 
-if (!filePath || !date || !time || !recur || msg === undefined) {
-  console.error('Usage: node add.js <filePath> <date> <time> <recur> <msg>');
+const config = loadConfig({ cwd: path.join(__dirname, '../../') });
+const filePath = config.reminders?.file_path;
+
+const [,, date, time, recur, msg] = process.argv;
+
+if (!filePath) {
+  console.error('Error: reminders.file_path not found in config.');
+  process.exit(1);
+}
+
+if (!date || !time || !recur || msg === undefined) {
+  console.error('Usage: node add.js <date> <time> <recur> <msg>');
+  process.exit(1);
+}
+
+if (!date || !time || !recur || msg === undefined) {
+  console.error('Usage: node add.js <date> <time> <recur> <msg>');
   process.exit(1);
 }
 

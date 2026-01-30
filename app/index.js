@@ -75,9 +75,6 @@ function startDiscordRuntime(deps = {}) {
     embeddingApiKey: process.env.GEMINI_API_KEY,
     embeddingModel: memoryConfig.embedding_model,
     skillsDir: require('path').join(__dirname, '../skills'),
-    skillPlaceholders: {
-      REMINDERS_FILE_PATH: remindersConfig.file_path,
-    },
     sendMessage,
     onReady: () => {
       logger.info('Discord runtime ready');

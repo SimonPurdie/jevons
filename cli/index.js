@@ -172,17 +172,6 @@ async function runCli() {
   let loadedSkills = [];
   try {
     loadedSkills = loadSkill({ skillsDir });
-    const skillPlaceholders = {
-      REMINDERS_FILE_PATH: remindersConfig.file_path,
-    };
-    loadedSkills = loadedSkills.map(skill => {
-      let content = skill.content || '';
-      for (const [key, value] of Object.entries(skillPlaceholders)) {
-        const placeholder = `{{${key}}}`;
-        content = content.split(placeholder).join(value || '');
-      }
-      return { ...skill, content };
-    });
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error(`Warning: Failed to load skills: ${err.message}`);
