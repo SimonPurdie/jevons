@@ -1,6 +1,8 @@
 const { loadConfig } = require('../app/config');
 const { generateReply, formatModelError } = require('../app/runtime');
 const { createMemoryInjectionProvider } = require('../app/runtime');
+const { loadSkill } = require('../skills/loader');
+const path = require('path');
 
 function printUsage() {
   // eslint-disable-next-line no-console
@@ -129,6 +131,29 @@ async function runCli() {
   }
 
   const memoryConfig = config.memory || {};
+  const remindersConfig = config.reminders || {};
+
+  // Load and process skills
+  const skillsDir = path.join(__dirname, '../skills');
+  let loadedSkills = [];
+  try {
+    loadedSkills = loadSkill({ skillsDir });
+    const skillPlaceholders = {
+      REMINDERS_FILE_PATH: remindersConfig.file_path,
+    };
+    loadedSkills = loadedSkills.map(skill => {
+      let content = skill.content || '';
+      for (const [key, value] of Object.entries(skillPlaceholders)) {
+        const placeholder = `{{${key}}}`;
+        content = content.split(placeholder).join(value || '');
+      }
+      return { ...skill, content };
+    });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error(`Warning: Failed to load skills: ${err.message}`);
+  }
+
   const memoryInjection = createMemoryInjectionProvider({
     indexPath: memoryConfig.index_path,
     embeddingApiKey: process.env.GEMINI_API_KEY,
@@ -139,6 +164,7 @@ async function runCli() {
   const options = {
     injection: memoryInjection,
     chatHistory: [], // CLI is stateless - no history
+    skills: loadedSkills,
   };
 
   try {

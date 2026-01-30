@@ -6,6 +6,7 @@ const { generateEmbedding } = require('../memory/index/embeddings');
 const { readLogEntry } = require('../memory/logs/logReader');
 const { readChatHistory } = require('../memory/chatHistory');
 const { createPinsManager } = require('../memory/pins/pins');
+const { loadSkill } = require('../skills/loader');
 
 function resolvePiAi() {
   try {
@@ -172,6 +173,12 @@ async function generateReply(payload, modelInstance, completeFn, options = {}) {
   // Build messages array with chat history
   const messages = [];
 
+  // Add skills if available
+  if (options.skills && options.skills.length > 0) {
+    const skillsContent = options.skills.map(s => s.content).join('\n\n');
+    messages.push({ role: 'system', content: `You have access to the following skills:\n\n${skillsContent}\n\nUse the bash tool to execute these skills when needed.` });
+  }
+
   // Add chat history if available
   if (options.chatHistory && options.chatHistory.length > 0) {
     messages.push(...options.chatHistory);
@@ -274,10 +281,33 @@ function createDiscordRuntime(options) {
     memoryMaxMemories,
     embeddingApiKey,
     embeddingModel,
+    skillsDir,
+    skillPlaceholders = {},
   } = options || {};
 
   if (typeof sendMessage !== 'function') {
     throw new Error('sendMessage callback is required');
+  }
+
+  // Load and process skills
+  let loadedSkills = [];
+  if (skillsDir) {
+    try {
+      loadedSkills = loadSkill({ skillsDir });
+      // Replace placeholders in skill content
+      loadedSkills = loadedSkills.map(skill => {
+        let content = skill.content || '';
+        for (const [key, value] of Object.entries(skillPlaceholders)) {
+          const placeholder = `{{${key}}}`;
+          content = content.split(placeholder).join(value || '');
+        }
+        return { ...skill, content };
+      });
+    } catch (err) {
+      if (typeof onError === 'function') {
+        onError(new Error(`Failed to load skills: ${err.message}`));
+      }
+    }
   }
 
   // Set up context window resolver for logging if logsRoot is provided
@@ -466,6 +496,7 @@ function createDiscordRuntime(options) {
           reply = await generateReply(payload, resolvedModel, completeFn, {
             injection: memoryInjectionProvider,
             chatHistory,
+            skills: loadedSkills,
           });
         } catch (err) {
           const errorMessage = formatModelError(err);
