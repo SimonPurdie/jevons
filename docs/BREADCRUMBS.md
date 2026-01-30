@@ -9,6 +9,12 @@ When using `generateEmbedding(dimensions, seed)` test helper:
 - Seeds 1 and 10 produce embeddings with ~0.36 cosine similarity
 - Don't assume "similar" seeds will have >0.9 similarity; use thresholds appropriate for actual values
 
+## Scheduler/Timezones
+
+- Native `Intl.DateTimeFormat` with `timeZone: 'Europe/London'` is used to handle timezone conversions without external libraries.
+- For DST Gaps (Spring Forward), we use a binary search to find the "transition point" (Next Valid Minute) where the local time offset changes. This allows us to map invalid local times (e.g. 01:30 during the 01:00-02:00 gap) to the first valid moment (02:00 BST / 01:00 UTC).
+- For DST Overlaps (Fall Back), checking the "earlier occurrence" corresponds to checking the BST offset (+1) before the GMT offset (+0).
+
 ## Test Running
 
 - Tests use Node.js built-in test runner: `npm test` or `node --test`

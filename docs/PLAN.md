@@ -48,7 +48,7 @@
 
 - [x] Implement reminders file parser (line grammar, invalid line handling); add tests for parsing edge cases.
 - [x] Implement reminder ID assignment (rid format) and safe append logic; add tests for id stability.
-- [ ] Implement scheduler scan + due detection (Europe/London time rules); add tests for DST edge cases.
+- [x] Implement scheduler scan + due detection (Europe/London time rules); add tests for DST edge cases.
 - [ ] Implement reminder lifecycle actions (one-off delete, recurring keep); add tests for file edits.
 - [ ] Implement Discord reminder notifications + confirmation messages; add tests/mocks for output format.
 
