@@ -39,7 +39,7 @@
 - Tracer B is "done" when: /remember pins a message and pinned memories are boosted in retrieval on the next turn, with tests covering precedence and storage.
 
 - [x] Implement pinned memory flow (/remember command + storage + retrieval boost); add tests for precedence.
-- [ ] Implement skills loader + execution via bash; add tests for script invocation and error handling.
+- [x] Implement skills loader + execution via bash; add tests for script invocation and error handling.
 - [ ] Implement minimal CLI harness (stateless, no history); add tests for parity with Discord core behaviors.
 
 --- Tracer C: reminders and scheduler
