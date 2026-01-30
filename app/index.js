@@ -51,8 +51,10 @@ function startDiscordRuntime(deps = {}) {
 
   const scheduler = _createSchedulerService({
     remindersFilePath: remindersConfig.file_path,
+    stateFilePath: require('path').join(__dirname, '../data/scheduler_state.json'),
     sendMessage,
     channelId: discordConfig.channel_id,
+    userId: remindersConfig.user_id,
     interval: 60000,
     onError: (err) => {
       logger.error('Scheduler error', err);

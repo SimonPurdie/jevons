@@ -10,9 +10,10 @@ const TIME_ZONE = 'Europe/London';
  * Check if a reminder is due at the given UTC time
  * @param {object} reminder - The parsed reminder object
  * @param {Date} nowUtc - The current time in UTC
+ * @param {Date} [lastRunUtc] - The time of the last scan in UTC (optional)
  * @returns {boolean} True if the reminder should fire
  */
-function isReminderDue(reminder, nowUtc) {
+function isReminderDue(reminder, nowUtc, lastRunUtc = null) {
   const { date, time, recur } = reminder;
   const londonParts = getLondonDateParts(nowUtc);
   
@@ -21,21 +22,12 @@ function isReminderDue(reminder, nowUtc) {
 
   if (recur === 'none') {
     // Exact date match required
-    // We only care if the reminder's target UTC execution time matches nowUtc.
-    // The target UTC execution time is determined by date+time in London.
-    // We can just set targetDateStr = date.
     targetDateStr = date;
   } else if (recur === 'daily') {
     // Fires every day. Target date is today (London).
     targetDateStr = `${londonParts.year}-${londonParts.month}-${londonParts.day}`;
   } else if (recur === 'weekly') {
     // Fires if today is the same day of week
-    // We can't easily check day of week from YYYY-MM-DD string without parsing
-    // But we can check if `nowUtc` roughly matches the cycle.
-    // Better: Check if `reminder.date` day of week matches `londonParts` day of week.
-    // We need a helper to get day of week for `reminder.date`.
-    const reminderDate = new Date(date); // This parses as UTC usually, but day of week is relative.
-    // Let's rely on the fact that `date` is YYYY-MM-DD.
     const reminderDayOfWeek = getDayOfWeek(date);
     const currentDayOfWeek = getDayOfWeek(`${londonParts.year}-${londonParts.month}-${londonParts.day}`);
     
@@ -46,7 +38,6 @@ function isReminderDue(reminder, nowUtc) {
     }
   } else if (recur === 'monthly') {
     // Fires if day of month matches.
-    // Handle "last day of month" logic.
     const reminderDay = parseInt(date.split('-')[2], 10);
     const currentDay = parseInt(londonParts.day, 10);
     const currentYear = parseInt(londonParts.year, 10);
@@ -72,14 +63,19 @@ function isReminderDue(reminder, nowUtc) {
   }
 
   // 2. Convert Target Local Time (London) to UTC Timestamp(s)
-  // This handles Gap and Overlap logic
   const dueTimestamp = localToUtc(targetDateStr, time);
 
   // 3. Compare with nowUtc
-  // Check if they are in the same minute
   const nowMs = nowUtc.getTime();
   const dueMs = dueTimestamp.getTime();
   
+  if (lastRunUtc) {
+    const lastRunMs = lastRunUtc.getTime();
+    // Fire if the due time fell between the last scan and now
+    return dueMs > lastRunMs && dueMs <= nowMs;
+  }
+
+  // Legacy/Default: Exact minute match
   // Floor to minutes
   const nowMin = Math.floor(nowMs / 60000);
   const dueMin = Math.floor(dueMs / 60000);
@@ -300,10 +296,11 @@ function getDaysInMonth(year, month) {
  * Find all reminders that are due at the given time
  * @param {Array} reminders - Array of parsed reminder objects
  * @param {Date} [nowUtc] - Current time (defaults to now)
+ * @param {Date} [lastRunUtc] - Time of last scan (optional)
  * @returns {Array} Array of due reminder objects
  */
-function scanDueReminders(reminders, nowUtc = new Date()) {
-  return reminders.filter(reminder => isReminderDue(reminder, nowUtc));
+function scanDueReminders(reminders, nowUtc = new Date(), lastRunUtc = null) {
+  return reminders.filter(reminder => isReminderDue(reminder, nowUtc, lastRunUtc));
 }
 
 module.exports = {

@@ -20,8 +20,10 @@ const { updateRemindersFile } = require('./lifecycle');
 function createSchedulerService(options) {
   const {
     remindersFilePath,
+    stateFilePath,
     sendMessage,
     channelId,
+    userId,
     interval = 60000,
     onError,
     onLog
@@ -33,6 +35,19 @@ function createSchedulerService(options) {
 
   let timer = null;
   let isRunning = false;
+  let lastScanTime = null;
+
+  // Load lastScanTime from state file if it exists
+  if (stateFilePath && fs.existsSync(stateFilePath)) {
+    try {
+      const state = JSON.parse(fs.readFileSync(stateFilePath, 'utf8'));
+      if (state.lastScanTime) {
+        lastScanTime = new Date(state.lastScanTime);
+      }
+    } catch (err) {
+      // ignore parse errors
+    }
+  }
 
   function log(msg) {
     if (typeof onLog === 'function') onLog(msg);
@@ -42,9 +57,21 @@ function createSchedulerService(options) {
     if (typeof onError === 'function') onError(err);
   }
 
+  function saveState() {
+    if (!stateFilePath || !lastScanTime) return;
+    try {
+      const state = { lastScanTime: lastScanTime.toISOString() };
+      fs.writeFileSync(stateFilePath, JSON.stringify(state), 'utf8');
+    } catch (err) {
+      error(err);
+    }
+  }
+
   async function scan() {
     if (isRunning) return;
     isRunning = true;
+
+    const now = new Date();
 
     try {
       if (!fs.existsSync(remindersFilePath)) {
@@ -64,8 +91,11 @@ function createSchedulerService(options) {
 
         // Send confirmations for assigned IDs
         for (const assigned of idResult.assigned) {
+           const confirmationMsg = userId 
+             ? `<@${userId}> Confirmed: Assigned ID to reminder.\n\`${assigned.newLine.trim()}\``
+             : `Confirmed: Assigned ID to reminder.\n\`${assigned.newLine.trim()}\``;
            await sendMessage({
-             content: `Confirmed: Assigned ID to reminder.\n\`${assigned.newLine.trim()}\``,
+             content: confirmationMsg,
              channelId: channelId
            });
         }
@@ -75,13 +105,16 @@ function createSchedulerService(options) {
       const reminders = parseRemindersFile(content);
 
       // 3. Scan for due reminders
-      const due = scanDueReminders(reminders);
+      const due = scanDueReminders(reminders, now, lastScanTime);
       
       if (due.length > 0) {
         // 4. Send notifications
         for (const reminder of due) {
+          const reminderMsg = userId
+            ? `<@${userId}> Reminder: ${reminder.msg}`
+            : `⏰ Reminder: ${reminder.msg}`;
           await sendMessage({
-            content: `⏰ Reminder: ${reminder.msg}`,
+            content: reminderMsg,
             channelId: channelId
           });
         }
@@ -92,6 +125,9 @@ function createSchedulerService(options) {
           fs.writeFileSync(remindersFilePath, updatedContent, 'utf8');
         }
       }
+
+      lastScanTime = now;
+      saveState();
 
     } catch (err) {
       error(err);

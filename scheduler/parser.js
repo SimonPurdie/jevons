@@ -82,27 +82,42 @@ function parseReminderLine(line) {
     // Parse value based on key
     let value;
     if (key === 'msg') {
-      // msg value is double-quoted and may contain escaped quotes
-      if (content[pos] !== '"') {
-        return null;
-      }
-      pos++; // Skip opening quote
-      let valueStr = '';
-      while (pos < content.length) {
-        if (content[pos] === '\\' && pos + 1 < content.length && content[pos + 1] === '"') {
-          // Escaped quote
-          valueStr += '"';
-          pos += 2;
-        } else if (content[pos] === '"') {
-          // Closing quote
-          pos++;
-          break;
+      // msg value is quoted or unquoted
+      if (content[pos] === '"' || content[pos] === "'") {
+        const quoteChar = content[pos];
+        pos++; // Skip opening quote
+        let valueStr = '';
+        while (pos < content.length) {
+          if (content[pos] === '\\' && pos + 1 < content.length && content[pos + 1] === quoteChar) {
+            // Escaped quote
+            valueStr += quoteChar;
+            pos += 2;
+          } else if (content[pos] === quoteChar) {
+            // Closing quote
+            pos++;
+            break;
+          } else {
+            valueStr += content[pos];
+            pos++;
+          }
+        }
+        value = valueStr;
+      } else {
+        // Unquoted message - take everything until the end or the next field (key=)
+        // This is tricky because the message can contain spaces.
+        // The spec says "Fields may appear in any order ... Humans may omit id".
+        // If msg is unquoted, we assume it's the last field or followed by id=...
+        // Actually, the simplest is to take until the next " key=" pattern if it exists, or the end.
+        const remaining = content.slice(pos);
+        const nextFieldMatch = remaining.match(/\s+(id|date|time|recur)=/);
+        if (nextFieldMatch) {
+          value = remaining.slice(0, nextFieldMatch.index);
+          pos += nextFieldMatch.index;
         } else {
-          valueStr += content[pos];
-          pos++;
+          value = remaining;
+          pos = content.length;
         }
       }
-      value = valueStr;
     } else {
       // Other values are unquoted, terminated by space or end of string
       const valueStart = pos;

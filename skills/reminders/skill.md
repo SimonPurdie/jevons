@@ -1,36 +1,40 @@
 # Skill: Reminders
 
-You can create, modify, and delete reminders by interacting with a specific markdown file using the `bash` tool.
+Manage your reminders using helper scripts. Always use these scripts instead of manual file editing.
 
-## Reminders File Format
-Each reminder is a single line:
-`- [ ] date=YYYY-MM-DD time=HH:MM recur=none|daily|weekly|monthly msg="..." id=RID`
-
-- `date`: YYYY-MM-DD (UK Local Time)
-- `time`: HH:MM (UK Local Time, 24h)
-- `recur`: One of `none`, `daily`, `weekly`, `monthly`
-- `msg`: The message in double quotes. Use `\"` for internal quotes.
-- `id`: Unique identifier (e.g., `rid_K5V4M2J9Q2ZP`). You can omit this when creating; the scheduler will assign one.
+## Reminders File Path
+The canonical reminders file is at: `{{REMINDERS_FILE_PATH}}`
 
 ## Operations
 
-### 1. Create a Reminder
-Append a new line to the file.
-Example: `echo "- [ ] date=2026-02-01 time=09:00 recur=none msg=\"Buy milk\"" >> {{REMINDERS_FILE_PATH}}`
+### 1. List Reminders
+Always start by listing reminders to see current state and IDs.
+`node skills/reminders/list.js {{REMINDERS_FILE_PATH}}`
 
-### 2. List Reminders
-Read the file.
-Example: `cat {{REMINDERS_FILE_PATH}}`
+### 2. Add a Reminder
+`node skills/reminders/add.js {{REMINDERS_FILE_PATH}} <date> <time> <recur> "<message>"`
 
-### 3. Delete a Reminder
-Remove the line containing the specific `id`.
-Example: `grep -v "id=rid_K5V4M2J9Q2ZP" {{REMINDERS_FILE_PATH}} > {{REMINDERS_FILE_PATH}}.tmp && mv {{REMINDERS_FILE_PATH}}.tmp {{REMINDERS_FILE_PATH}}`
+- `date`: YYYY-MM-DD (e.g., 2026-02-15)
+- `time`: HH:MM (24h, e.g., 14:00)
+- `recur`: one of `none`, `daily`, `weekly`, `monthly`
+- `message`: Double-quoted string.
 
-### 4. Modify a Reminder
-Replace the line or delete and re-add.
+Example: `node skills/reminders/add.js {{REMINDERS_FILE_PATH}} 2026-02-15 09:00 none "Buy groceries"`
+
+### 3. Update a Reminder
+Modify an existing reminder by its ID. You must provide ALL fields.
+`node skills/reminders/update.js {{REMINDERS_FILE_PATH}} <id> <date> <time> <recur> "<message>"`
+
+Example: `node skills/reminders/update.js {{REMINDERS_FILE_PATH}} rid_K5V4M2J9Q2ZP 2026-02-15 10:00 none "Buy groceries and milk"`
+
+### 4. Delete a Reminder
+Remove a reminder by its ID.
+`node skills/reminders/delete.js {{REMINDERS_FILE_PATH}} <id>`
+
+Example: `node skills/reminders/delete.js {{REMINDERS_FILE_PATH}} rid_K5V4M2J9Q2ZP`
 
 ## Important Notes
 - All times are **Europe/London**.
-- The scheduler scans this file once per minute.
-- One-off reminders are automatically deleted after they fire.
-- Always confirm to the user the exact line you wrote or the action you took.
+- The scheduler scans the file once per minute.
+- One-off reminders (`recur=none`) are automatically deleted after firing.
+- Confirm the action taken to the user by repeating the script's confirmation message.

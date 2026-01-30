@@ -6,11 +6,12 @@ const path = require('path');
 
 function printUsage() {
   // eslint-disable-next-line no-console
-  console.log(`Usage: jevons [options] <message>
+  console.log(`Usage: jevons [options] [message]
 
 Options:
   -h, --help         Show this help message
   -p, --prompt       Read message from stdin instead of arguments
+  --scan             Run a single scheduler scan for due reminders
 
 Environment:
   Requires model configuration (provider and model name)
@@ -19,6 +20,7 @@ Environment:
 Examples:
   jevons "Hello, world"
   echo "Hello" | jevons -p
+  jevons --scan
 `);
 }
 
@@ -27,6 +29,7 @@ function parseArgs(args) {
     message: null,
     useStdin: false,
     help: false,
+    scan: false,
   };
 
   let collectingMessage = false;
@@ -37,6 +40,8 @@ function parseArgs(args) {
       result.help = true;
     } else if (!collectingMessage && (arg === '-p' || arg === '--prompt')) {
       result.useStdin = true;
+    } else if (!collectingMessage && arg === '--scan') {
+      result.scan = true;
     } else if (!arg.startsWith('-') && result.message === null) {
       result.message = arg;
       collectingMessage = true;
@@ -73,14 +78,6 @@ async function readStdin() {
   });
 }
 
-function resolvePiAi() {
-  try {
-    return require('@mariozechner/pi-ai');
-  } catch (err) {
-    throw new Error('pi-ai is not installed; run npm install');
-  }
-}
-
 async function runCli() {
   const args = parseArgs(process.argv.slice(2));
 
@@ -90,7 +87,45 @@ async function runCli() {
   }
 
   const config = loadConfig();
+  const discordConfig = config.discord || {};
   const modelConfig = config.model || {};
+  const remindersConfig = config.reminders || {};
+
+  if (args.scan) {
+    const { createSchedulerService } = require('../scheduler/service');
+    const { Client, GatewayIntentBits } = require('discord.js');
+
+    if (!discordConfig.token || !discordConfig.channel_id) {
+      console.error('Error: Discord token and channel_id must be configured for scanning');
+      process.exitCode = 1;
+      return;
+    }
+
+    const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+    await client.login(discordConfig.token);
+
+    const sendMessage = async (payload) => {
+      const targetId = payload.threadId || payload.channelId;
+      const channel = await client.channels.fetch(targetId);
+      if (channel && typeof channel.send === 'function') {
+        await channel.send(payload.content);
+      }
+    };
+
+    const scheduler = createSchedulerService({
+      remindersFilePath: remindersConfig.file_path,
+      stateFilePath: path.join(__dirname, '../data/scheduler_state.json'),
+      sendMessage,
+      channelId: discordConfig.channel_id,
+      userId: remindersConfig.user_id,
+      onLog: (msg) => console.log(`[scheduler] ${msg}`),
+      onError: (err) => console.error(`[scheduler] Error: ${err.message}`),
+    });
+
+    await scheduler.scan();
+    client.destroy();
+    return;
+  }
 
   if (!modelConfig.provider || !modelConfig.model) {
     // eslint-disable-next-line no-console
@@ -131,7 +166,6 @@ async function runCli() {
   }
 
   const memoryConfig = config.memory || {};
-  const remindersConfig = config.reminders || {};
 
   // Load and process skills
   const skillsDir = path.join(__dirname, '../skills');
