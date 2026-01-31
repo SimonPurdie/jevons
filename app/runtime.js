@@ -163,7 +163,7 @@ const path = require('path');
 function logContextToFile(context) {
   const logsDir = path.join(process.cwd(), 'logs');
   const contextPath = path.join(logsDir, 'context.txt');
-  
+
   try {
     const logEntry = {
       "systemPrompt": context.systemPrompt,
@@ -252,17 +252,17 @@ function readWorkspaceFiles(fileNames, baseDir) {
 
 function buildSystemPrompt(skills, workspaceFilesContent) {
   let sections = [];
-  
+
   if (skills && skills.length > 0) {
     const skillsContent = skills.map((skill) => skill.content).join('\n\n');
     sections.push(`You have access to the following skills:\n\n${skillsContent}\n\nUse the bash tool to execute these skills when needed.`);
   }
-  
+
   if (workspaceFilesContent) {
     const header = `- **Workspace Files (injected)**: AGENTS.md SOUL.md TOOLS.md IDENTITY.md USER.md ( all located in /home/simon/jevons and labelled with their full path and filename before their content )`;
     sections.push(`${header}\n${workspaceFilesContent}`);
   }
-  
+
   return sections.join('\n\n');
 }
 
@@ -277,16 +277,16 @@ function formatCurrentTime(date = new Date()) {
   const hh = String(date.getHours()).padStart(2, '0');
   const min = String(date.getMinutes()).padStart(2, '0');
   const ss = String(date.getSeconds()).padStart(2, '0');
-  
+
   const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const weekday = weekdays[date.getDay()];
-  
+
   const hour = date.getHours();
   let timeOfDay = 'night';
   if (hour >= 5 && hour < 12) timeOfDay = 'morning';
   else if (hour >= 12 && hour < 17) timeOfDay = 'afternoon';
   else if (hour >= 17 && hour < 21) timeOfDay = 'evening';
-  
+
   return `<Current Time: ${yyyy}-${mm}-${dd} ${hh}:${min}:${ss} ${weekday} ${timeOfDay}>`;
 }
 
@@ -336,6 +336,14 @@ async function generateReply(payload, modelInstance, options = {}) {
       tools: Array.isArray(options.tools) ? options.tools : [],
       messages: historyMessages,
     },
+    getApiKey: async (provider) => {
+      if (options.authStorage) {
+        const key = await options.authStorage.getApiKey(provider);
+        if (key) return key;
+      }
+      // Fallback or error
+      throw new Error(`No API key found for provider "${provider}". Check .env or auth.json.`);
+    }
   });
 
   logContextToFile({
@@ -372,8 +380,8 @@ function createDiscordRuntime(options) {
     client,
     token,
     channelId,
-    provider,
-    model,
+    activeModel,
+    models,
     providers,
     modelInstance,
     getModel: getModelOverride,
@@ -382,9 +390,9 @@ function createDiscordRuntime(options) {
     onError,
     memoryRoot,
     skillsDir,
-    skillPlaceholders = {},
     ipcPort,
     deps = {},
+    authStorage,
   } = options || {};
 
   const _Agent = deps.Agent;
@@ -449,22 +457,38 @@ function createDiscordRuntime(options) {
     return readChatHistory(window.path);
   }
 
-  if (!modelInstance && (!provider || !model)) {
-    throw new Error('model provider and model name are required');
-  }
-
   let resolvedModel = modelInstance;
   if (!resolvedModel) {
     const piAi = _resolvePiAi();
     const getModelFn = getModelOverride || piAi.getModel;
-    const getModelsFn = piAi.getModels;
-    resolvedModel = getModelFn(provider, model, providers);
+
+    let targetProvider;
+    let targetModel;
+
+    if (activeModel && models && models[activeModel]) {
+      targetProvider = models[activeModel].provider;
+      targetModel = models[activeModel].model;
+    } else if (options.provider && options.model) {
+      // Fallback to direct options if provided (though deprecated in config)
+      targetProvider = options.provider;
+      targetModel = options.model;
+    }
+
+    if (!targetProvider || !targetModel) {
+      // Construct a helpful error message
+      const configDebug = { activeModel, modelsKeys: models ? Object.keys(models) : [] };
+      throw new Error(`No active model configuration found. Please check config.json. Debug: ${JSON.stringify(configDebug)}`);
+    }
+
+    resolvedModel = getModelFn(targetProvider, targetModel, providers);
+    // getModel might return null/undefined if provider not found
     if (!resolvedModel) {
-      const available = typeof getModelsFn === 'function' ? getModelsFn(provider) : [];
+      const getModelsFn = piAi.getModels;
+      const available = typeof getModelsFn === 'function' ? getModelsFn(targetProvider) : [];
       const names = available.map((entry) => entry.id || entry);
       const preview = names.slice(0, 10).join(', ');
       const suffix = names.length > 10 ? '…' : '';
-      throw new Error(`Unknown model "${model}" for provider "${provider}". Available: ${preview}${suffix}`);
+      throw new Error(`Unknown model "${targetModel}" for provider "${targetProvider}". Available: ${preview}${suffix}`);
     }
   }
 
@@ -537,6 +561,7 @@ function createDiscordRuntime(options) {
             tools: runtimeTools,
             Agent: _Agent,
             resolvePiAgentCore: _resolvePiAgentCore,
+            authStorage,
           });
         } catch (err) {
           const errorMessage = formatModelError(err);

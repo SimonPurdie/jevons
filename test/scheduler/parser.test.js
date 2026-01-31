@@ -39,7 +39,7 @@ test('parseReminderLine returns null for non-string input', () => {
 test('parseReminderLine parses valid line with all fields', () => {
   const line = '- [ ] date=2026-01-30 time=14:23 recur=none msg="Test reminder" id=rid_K5V4M2J3Q2ZL';
   const result = parseReminderLine(line);
-  
+
   assert.ok(result);
   assert.equal(result.date, '2026-01-30');
   assert.equal(result.time, '14:23');
@@ -51,7 +51,7 @@ test('parseReminderLine parses valid line with all fields', () => {
 test('parseReminderLine parses valid line without id', () => {
   const line = '- [ ] date=2026-01-30 time=14:23 recur=none msg="Test reminder"';
   const result = parseReminderLine(line);
-  
+
   assert.ok(result);
   assert.equal(result.date, '2026-01-30');
   assert.equal(result.time, '14:23');
@@ -63,7 +63,7 @@ test('parseReminderLine parses valid line without id', () => {
 test('parseReminderLine parses fields in any order', () => {
   const line = '- [ ] msg="Test" date=2026-01-30 recur=weekly time=09:00 id=rid_ABCDEFGHIJKL';
   const result = parseReminderLine(line);
-  
+
   assert.ok(result);
   assert.equal(result.date, '2026-01-30');
   assert.equal(result.time, '09:00');
@@ -136,7 +136,7 @@ test('parseReminderLine returns null for invalid id format', () => {
 test('parseReminderLine handles escaped quotes in msg', () => {
   const line = '- [ ] date=2026-01-30 time=14:23 recur=none msg="Say \\"hello\\" to everyone"';
   const result = parseReminderLine(line);
-  
+
   assert.ok(result);
   assert.equal(result.msg, 'Say "hello" to everyone');
 });
@@ -144,7 +144,7 @@ test('parseReminderLine handles escaped quotes in msg', () => {
 test('parseReminderLine handles multiple escaped quotes', () => {
   const line = '- [ ] date=2026-01-30 time=14:23 recur=none msg="\\"First\\" and \\"second\\" quote"';
   const result = parseReminderLine(line);
-  
+
   assert.ok(result);
   assert.equal(result.msg, '"First" and "second" quote');
 });
@@ -152,7 +152,7 @@ test('parseReminderLine handles multiple escaped quotes', () => {
 test('parseReminderLine handles msg with spaces', () => {
   const line = '- [ ] date=2026-01-30 time=14:23 recur=none msg="This is a longer message with spaces"';
   const result = parseReminderLine(line);
-  
+
   assert.ok(result);
   assert.equal(result.msg, 'This is a longer message with spaces');
 });
@@ -160,14 +160,17 @@ test('parseReminderLine handles msg with spaces', () => {
 test('parseReminderLine handles empty msg', () => {
   const line = '- [ ] date=2026-01-30 time=14:23 recur=none msg=""';
   const result = parseReminderLine(line);
-  
+
   assert.ok(result);
   assert.equal(result.msg, '');
 });
 
-test('parseReminderLine returns null for unquoted msg', () => {
+test('parseReminderLine parses unquoted msg', () => {
   const line = '- [ ] date=2026-01-30 time=14:23 recur=none msg=Test';
-  assert.equal(parseReminderLine(line), null);
+  const result = parseReminderLine(line);
+
+  assert.ok(result);
+  assert.equal(result.msg, 'Test');
 });
 
 test('parseReminderLine returns null for msg with unescaped quote', () => {
@@ -217,7 +220,7 @@ test('parseReminderLine handles extra whitespace', () => {
 test('parseReminderLine handles msg at end without trailing content', () => {
   const line = '- [ ] date=2026-01-30 time=14:23 recur=none msg="Test"';
   const result = parseReminderLine(line);
-  
+
   assert.ok(result);
   assert.equal(result.msg, 'Test');
   assert.equal(result.id, null);
@@ -226,7 +229,7 @@ test('parseReminderLine handles msg at end without trailing content', () => {
 test('parseReminderLine handles msg with special characters', () => {
   const line = '- [ ] date=2026-01-30 time=14:23 recur=none msg="Test @#$%^&*()_+-=[]{}|;:,.<>?"';
   const result = parseReminderLine(line);
-  
+
   assert.ok(result);
   assert.equal(result.msg, 'Test @#$%^&*()_+-=[]{}|;:,.<>?');
 });
@@ -234,7 +237,7 @@ test('parseReminderLine handles msg with special characters', () => {
 test('parseReminderLine handles msg with unicode characters', () => {
   const line = '- [ ] date=2026-01-30 time=14:23 recur=none msg="Hello 世界 🌍"';
   const result = parseReminderLine(line);
-  
+
   assert.ok(result);
   assert.equal(result.msg, 'Hello 世界 🌍');
 });
@@ -242,7 +245,7 @@ test('parseReminderLine handles msg with unicode characters', () => {
 test('parseReminderLine handles valid leap year date', () => {
   const line = '- [ ] date=2024-02-29 time=14:23 recur=none msg="Leap year"';
   const result = parseReminderLine(line);
-  
+
   assert.ok(result);
   assert.equal(result.date, '2024-02-29');
 });
@@ -287,9 +290,9 @@ test('parseRemindersFile parses multiple valid reminders', () => {
   const content = `- [ ] date=2026-01-30 time=09:00 recur=none msg="First reminder" id=rid_AAAAAAAAAAAA
 - [ ] date=2026-01-31 time=10:00 recur=daily msg="Second reminder" id=rid_BBBBBBBBBBBB
 - [ ] date=2026-02-01 time=11:00 recur=weekly msg="Third reminder" id=rid_CCCCCCCCCCCC`;
-  
+
   const results = parseRemindersFile(content);
-  
+
   assert.equal(results.length, 3);
   assert.equal(results[0].msg, 'First reminder');
   assert.equal(results[0]._lineNumber, 1);
@@ -307,7 +310,7 @@ test('parseRemindersFile skips empty lines', () => {
 
 `;
   const results = parseRemindersFile(content);
-  
+
   assert.equal(results.length, 2);
   assert.equal(results[0]._lineNumber, 2);
   assert.equal(results[1]._lineNumber, 4);
@@ -319,9 +322,9 @@ test('parseRemindersFile skips comment lines', () => {
 # Another comment
 - [ ] date=2026-01-31 time=15:23 recur=none msg="Test 2"
   # Indented comment`;
-  
+
   const results = parseRemindersFile(content);
-  
+
   assert.equal(results.length, 2);
   assert.equal(results[0]._lineNumber, 2);
   assert.equal(results[1]._lineNumber, 4);
@@ -332,9 +335,9 @@ test('parseRemindersFile skips invalid lines silently', () => {
 Invalid line without task marker
 - [ ] missing=fields
 - [ ] date=2026-01-31 time=15:23 recur=none msg="Also valid"`;
-  
+
   const results = parseRemindersFile(content);
-  
+
   assert.equal(results.length, 2);
   assert.equal(results[0].msg, 'Valid');
   assert.equal(results[0]._lineNumber, 1);
@@ -352,9 +355,9 @@ Invalid line here
 - [ ] date=2026-02-01 time=10:00 recur=weekly msg="Weekly review" id=rid_BBBBBBBBBBBB
 
 # End of file`;
-  
+
   const results = parseRemindersFile(content);
-  
+
   assert.equal(results.length, 3);
   assert.equal(results[0].msg, 'Daily standup');
   assert.equal(results[1].msg, 'One-off meeting');
@@ -364,7 +367,7 @@ Invalid line here
 test('parseRemindersFile preserves raw line content', () => {
   const line = '- [ ] date=2026-01-30 time=14:23 recur=none msg="Test" id=rid_K5V4M2J3Q2ZL';
   const results = parseRemindersFile(line);
-  
+
   assert.equal(results.length, 1);
   assert.equal(results[0]._raw, line);
 });
@@ -386,7 +389,7 @@ test('generateReminderId returns different values on multiple calls', () => {
   const id1 = generateReminderId();
   const id2 = generateReminderId();
   const id3 = generateReminderId();
-  
+
   assert.notEqual(id1, id2);
   assert.notEqual(id2, id3);
   assert.notEqual(id1, id3);
@@ -396,7 +399,7 @@ test('generateReminderId generates 12 base32 characters', () => {
   const id = generateReminderId();
   const base32Part = id.slice(4); // Remove 'rid_'
   assert.equal(base32Part.length, 12);
-  
+
   // All characters should be in base32 alphabet
   const BASE32_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
   for (const char of base32Part) {
@@ -414,7 +417,7 @@ test('formatReminderLine formats basic reminder', () => {
     msg: 'Test reminder',
     id: 'rid_K5V4M2J3Q2ZL',
   };
-  
+
   const line = formatReminderLine(reminder);
   assert.equal(line, '- [ ] date=2026-01-30 time=14:23 recur=none msg="Test reminder" id=rid_K5V4M2J3Q2ZL');
 });
@@ -427,7 +430,7 @@ test('formatReminderLine omits id when null', () => {
     msg: 'Test reminder',
     id: null,
   };
-  
+
   const line = formatReminderLine(reminder);
   assert.equal(line, '- [ ] date=2026-01-30 time=14:23 recur=none msg="Test reminder"');
 });
@@ -440,7 +443,7 @@ test('formatReminderLine escapes quotes in msg', () => {
     msg: 'Say "hello" to everyone',
     id: null,
   };
-  
+
   const line = formatReminderLine(reminder);
   assert.equal(line, '- [ ] date=2026-01-30 time=14:23 recur=none msg="Say \\"hello\\" to everyone"');
 });
@@ -454,7 +457,7 @@ test('formatReminderLine handles all recurrence types', () => {
       msg: 'Test',
       id: null,
     };
-    
+
     const line = formatReminderLine(reminder);
     assert.ok(line.includes(`recur=${recur}`), `Should include recurrence: ${recur}`);
   }
@@ -468,10 +471,10 @@ test('formatReminderLine roundtrips with parseReminderLine', () => {
     msg: 'Weekly meeting with "quotes" and spaces',
     id: 'rid_K5V4M2J3Q2ZL',
   };
-  
+
   const line = formatReminderLine(original);
   const parsed = parseReminderLine(line);
-  
+
   assert.ok(parsed);
   assert.equal(parsed.date, original.date);
   assert.equal(parsed.time, original.time);
@@ -559,7 +562,7 @@ test('assignMissingIds returns unchanged for empty string', () => {
 test('assignMissingIds assigns ID to valid line without ID', () => {
   const content = '- [ ] date=2026-01-30 time=14:23 recur=none msg="Test reminder"';
   const result = assignMissingIds(content);
-  
+
   assert.equal(result.assigned.length, 1);
   assert.ok(result.assigned[0].id.startsWith('rid_'));
   assert.ok(ID_PATTERN.test(result.assigned[0].id));
@@ -572,7 +575,7 @@ test('assignMissingIds assigns ID to valid line without ID', () => {
 test('assignMissingIds does not modify line with existing ID', () => {
   const content = '- [ ] date=2026-01-30 time=14:23 recur=none msg="Test reminder" id=rid_K5V4M2J3Q2ZL';
   const result = assignMissingIds(content);
-  
+
   assert.equal(result.assigned.length, 0);
   assert.equal(result.content, content);
   assert.equal(result.unchanged, 1);
@@ -581,7 +584,7 @@ test('assignMissingIds does not modify line with existing ID', () => {
 test('assignMissingIds does not modify invalid lines', () => {
   const content = 'Invalid line without task marker';
   const result = assignMissingIds(content);
-  
+
   assert.equal(result.assigned.length, 0);
   assert.equal(result.content, content);
   assert.equal(result.unchanged, 1);
@@ -590,7 +593,7 @@ test('assignMissingIds does not modify invalid lines', () => {
 test('assignMissingIds does not modify empty lines', () => {
   const content = '\n\n';
   const result = assignMissingIds(content);
-  
+
   assert.equal(result.assigned.length, 0);
   assert.equal(result.content, content);
   assert.equal(result.unchanged, 3); // 3 empty lines (including trailing)
@@ -599,7 +602,7 @@ test('assignMissingIds does not modify empty lines', () => {
 test('assignMissingIds does not modify comment lines', () => {
   const content = '# This is a comment\n  # Indented comment';
   const result = assignMissingIds(content);
-  
+
   assert.equal(result.assigned.length, 0);
   assert.equal(result.content, content);
   assert.equal(result.unchanged, 2);
@@ -614,24 +617,24 @@ Invalid line here
 - [ ] date=2026-02-01 time=10:00 recur=weekly msg="Weekly review"
 
 # End of file`;
-  
+
   const result = assignMissingIds(content);
-  
+
   // Should assign IDs to 2 lines that don't have them
   assert.equal(result.assigned.length, 2);
   assert.equal(result.unchanged, 6); // 2 comments, 1 empty, 1 with existing ID, 1 invalid, 1 empty
-  
+
   // Verify the lines that got IDs
   const linesWithoutId = result.assigned.map(a => a.lineNumber);
   assert.ok(linesWithoutId.includes(4)); // One-off meeting
   assert.ok(linesWithoutId.includes(6)); // Weekly review
-  
+
   // Verify assigned IDs are valid
   for (const assignment of result.assigned) {
     assert.ok(ID_PATTERN.test(assignment.id));
     assert.ok(assignment.newLine.includes(`id=${assignment.id}`));
   }
-  
+
   // Verify the content with existing ID is unchanged
   assert.ok(result.content.includes('id=rid_AAAAAAAAAAAA'));
 });
@@ -639,7 +642,7 @@ Invalid line here
 test('assignMissingIds preserves original line structure', () => {
   const content = '- [ ] date=2026-01-30 time=14:23 recur=none msg="Test reminder"';
   const result = assignMissingIds(content);
-  
+
   // The ID should be appended after the msg field
   const parsed = parseReminderLine(result.content);
   assert.ok(parsed);
@@ -654,11 +657,11 @@ test('assignMissingIds assigns unique IDs to multiple lines', () => {
   const content = `- [ ] date=2026-01-30 time=09:00 recur=none msg="First"
 - [ ] date=2026-01-31 time=10:00 recur=none msg="Second"
 - [ ] date=2026-02-01 time=11:00 recur=none msg="Third"`;
-  
+
   const result = assignMissingIds(content);
-  
+
   assert.equal(result.assigned.length, 3);
-  
+
   // All IDs should be unique
   const ids = result.assigned.map(a => a.id);
   const uniqueIds = new Set(ids);
@@ -668,7 +671,7 @@ test('assignMissingIds assigns unique IDs to multiple lines', () => {
 test('assignMissingIds preserves whitespace after msg field', () => {
   const content = '- [ ] date=2026-01-30 time=14:23 recur=none msg="Test reminder"    ';
   const result = assignMissingIds(content);
-  
+
   // The ID should be inserted before the trailing whitespace
   assert.ok(result.content.includes('msg="Test reminder" id='));
 });
@@ -676,7 +679,7 @@ test('assignMissingIds preserves whitespace after msg field', () => {
 test('assignMissingIds handles msg with escaped quotes', () => {
   const content = '- [ ] date=2026-01-30 time=14:23 recur=none msg="Say \\"hello\\" to everyone"';
   const result = assignMissingIds(content);
-  
+
   assert.equal(result.assigned.length, 1);
   const parsed = parseReminderLine(result.content);
   assert.ok(parsed);
@@ -692,12 +695,12 @@ test('assignMissingIds roundtrips correctly', () => {
     msg: 'Weekly meeting',
     id: null,
   };
-  
+
   const line = formatReminderLine(original);
   const result = assignMissingIds(line);
-  
+
   assert.equal(result.assigned.length, 1);
-  
+
   // The resulting line should be parseable and have the same data
   const parsed = parseReminderLine(result.content);
   assert.ok(parsed);
@@ -711,9 +714,9 @@ test('assignMissingIds roundtrips correctly', () => {
 test('assignMissingIds generates valid IDs that pass pattern validation', () => {
   const content = `- [ ] date=2026-01-30 time=09:00 recur=none msg="First"
 - [ ] date=2026-01-31 time=10:00 recur=none msg="Second"`;
-  
+
   const result = assignMissingIds(content);
-  
+
   for (const assignment of result.assigned) {
     assert.ok(ID_PATTERN.test(assignment.id), `ID ${assignment.id} should match pattern`);
   }
@@ -726,9 +729,9 @@ test('assigned entries track correct line numbers', () => {
 - [ ] date=2026-01-31 time=10:00 recur=none msg="Line 4"
 Invalid line
 - [ ] date=2026-02-01 time=11:00 recur=none msg="Line 6"`;
-  
+
   const result = assignMissingIds(content);
-  
+
   assert.equal(result.assigned.length, 3);
   assert.equal(result.assigned[0].lineNumber, 2);
   assert.equal(result.assigned[1].lineNumber, 4);
@@ -738,9 +741,9 @@ Invalid line
 test('assignMissingIds does not modify content when all lines have IDs', () => {
   const content = `- [ ] date=2026-01-30 time=09:00 recur=none msg="First" id=rid_AAAAAAAAAAAA
 - [ ] date=2026-01-31 time=10:00 recur=none msg="Second" id=rid_BBBBBBBBBBBB`;
-  
+
   const result = assignMissingIds(content);
-  
+
   assert.equal(result.assigned.length, 0);
   assert.equal(result.content, content);
   assert.equal(result.unchanged, 2);

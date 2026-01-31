@@ -5,6 +5,8 @@ const { createSchedulerService } = require('../scheduler/service');
 const { createIpcServer } = require('./ipc');
 const logger = require('./logger');
 const { getDefaultMemoryRoot } = require('../memory/logs/logWriter');
+const { AuthStorage } = require('./auth');
+const path = require('path');
 
 function createDiscordClient() {
   return new Client({
@@ -16,21 +18,22 @@ function createDiscordClient() {
   });
 }
 
-async function sendDiscordMessage(client, payload) {
+function sendDiscordMessage(client, payload) {
   const { content, channelId, threadId } = payload;
   let targetId = (threadId && threadId !== 'null') ? threadId : channelId;
-  
+
   if (targetId === 'null') targetId = null;
 
   if (!targetId) {
-    throw new Error('Unable to send message: No valid channelId or threadId provided');
+    return Promise.reject(new Error('Unable to sending message: No valid channelId or threadId provided'));
   }
 
-  const channel = await client.channels.fetch(targetId);
-  if (!channel || typeof channel.send !== 'function') {
-    throw new Error(`Unable to send message to channel ${targetId}`);
-  }
-  await channel.send(content);
+  return client.channels.fetch(targetId).then(channel => {
+    if (!channel || typeof channel.send !== 'function') {
+      throw new Error(`Unable to send message to channel ${targetId}`);
+    }
+    return channel.send(content);
+  });
 }
 
 async function startDiscordRuntime(deps = {}) {
@@ -39,8 +42,10 @@ async function startDiscordRuntime(deps = {}) {
   const _createSchedulerService = deps.createSchedulerService || createSchedulerService;
   const _createDiscordClient = deps.createDiscordClient || createDiscordClient;
 
+  // Initialize AuthStorage
+  const authStorage = new AuthStorage(path.join(process.cwd(), 'config', 'auth.json'));
+
   const config = _loadConfig();
-  const modelConfig = config.model || {};
   const discordConfig = config.discord || {};
   const memoryConfig = config.memory || {};
   const remindersConfig = config.reminders || {};
@@ -51,8 +56,9 @@ async function startDiscordRuntime(deps = {}) {
   if (!discordConfig.channel_id) {
     throw new Error('Discord channel_id missing in config');
   }
-  if (!modelConfig.provider || !modelConfig.model) {
-    throw new Error('Model provider and model name must be configured');
+
+  if (!config.activeModel && (!config.models || Object.keys(config.models).length === 0)) {
+    throw new Error('Configuration error: "activeModel" and "models" must be defined in config.json.');
   }
 
   const client = _createDiscordClient();
@@ -65,7 +71,7 @@ async function startDiscordRuntime(deps = {}) {
 
   const scheduler = _createSchedulerService({
     remindersFilePath: remindersConfig.file_path,
-    stateFilePath: require('path').join(__dirname, '../data/scheduler_state.json'),
+    stateFilePath: path.join(__dirname, '../logs/scheduler_state.json'),
     sendMessage,
     channelId: discordConfig.channel_id,
     userId: remindersConfig.user_id,
@@ -82,9 +88,10 @@ async function startDiscordRuntime(deps = {}) {
     client,
     token: discordConfig.token,
     channelId: discordConfig.channel_id,
-    provider: modelConfig.provider,
-    model: modelConfig.model,
-    skillsDir: require('path').join(__dirname, '../skills'),
+    activeModel: config.activeModel,
+    models: config.models,
+    authStorage,
+    skillsDir: path.join(__dirname, '../skills'),
     sendMessage,
     ipcPort,
     memoryRoot: memoryConfig.root || getDefaultMemoryRoot(),

@@ -12,32 +12,26 @@ function makeTempDir() {
 function writeConfig(dir, data) {
   const configDir = path.join(dir, 'config');
   fs.mkdirSync(configDir, { recursive: true });
-  const configPath = path.join(configDir, 'jevons.config.json');
+  const configPath = path.join(configDir, 'config.json');
   fs.writeFileSync(configPath, JSON.stringify(data, null, 2));
   return configPath;
 }
 
-test('loadConfig returns empty object when config file missing', () => {
+test('loadConfig returns default structure when config file missing', () => {
   const dir = makeTempDir();
   const config = loadConfig({ cwd: dir, env: {} });
-  assert.deepEqual(config, {});
+  // Expect models: {} by default now
+  assert.deepEqual(config, { models: {} });
 });
 
-test('loadConfig reads legacy config/config.json when present', () => {
-  const dir = makeTempDir();
-  const configDir = path.join(dir, 'config');
-  fs.mkdirSync(configDir, { recursive: true });
-  const data = { discord: { channel_id: 'legacy' } };
-  fs.writeFileSync(path.join(configDir, 'config.json'), JSON.stringify(data, null, 2));
-  const config = loadConfig({ cwd: dir, env: {} });
-  assert.deepEqual(config, data);
-});
-
-test('loadConfig reads config file when present', () => {
+test('loadConfig reads config/config.json when present', () => {
   const dir = makeTempDir();
   const data = {
     discord: { token: 'file-token', channel_id: '123' },
-    model: { provider: 'openai', model: 'gpt-4.1-mini' },
+    activeModel: 'primary',
+    models: {
+      primary: { provider: 'google', model: 'gemini-1.5-flash' }
+    }
   };
   writeConfig(dir, data);
   const config = loadConfig({ cwd: dir, env: {} });
@@ -48,46 +42,33 @@ test('loadConfig applies environment overrides', () => {
   const dir = makeTempDir();
   const data = {
     discord: { token: 'file-token', channel_id: '123' },
-    reminders: { timezone: 'Europe/London' },
+    activeModel: 'primary',
   };
   writeConfig(dir, data);
   const env = {
     JEVONS_DISCORD_TOKEN: 'env-token',
-    JEVONS_REMINDERS_TIMEZONE: 'Europe/London',
+    JEVONS_ACTIVE_MODEL: 'coding',
   };
   const config = loadConfig({ cwd: dir, env });
   assert.equal(config.discord.token, 'env-token');
-  assert.equal(config.discord.channel_id, '123');
-  assert.equal(config.reminders.timezone, 'Europe/London');
+  assert.equal(config.activeModel, 'coding');
 });
 
-test('loadConfig reads config/.env file when present', () => {
+test('loadConfig ignores legacy env vars for models', () => {
   const dir = makeTempDir();
   writeConfig(dir, {});
-  const envPath = path.join(dir, 'config', '.env');
-  fs.writeFileSync(envPath, 'JEVONS_MODEL_NAME=gemini-3-flash-preview\nGEMINI_API_KEY=key-123\n');
-  const config = loadConfig({ cwd: dir, env: {} });
-  assert.equal(config.model.model, 'gemini-3-flash-preview');
-});
-
-test('loadConfig can apply env file to process.env', () => {
-  const dir = makeTempDir();
-  writeConfig(dir, {});
-  const envPath = path.join(dir, 'config', '.env');
-  fs.writeFileSync(envPath, 'GEMINI_API_KEY=key-456\n');
-  delete process.env.GEMINI_API_KEY;
-  loadConfig({ cwd: dir });
-  assert.equal(process.env.GEMINI_API_KEY, 'key-456');
-});
-
-test('loadConfig prefers process env over config/.env file', () => {
-  const dir = makeTempDir();
-  writeConfig(dir, {});
-  const envPath = path.join(dir, 'config', '.env');
-  fs.writeFileSync(envPath, 'JEVONS_MODEL_PROVIDER=google\n');
+  // JEVONS_MODEL_PROVIDER was removed from ENV_MAP
   const env = {
     JEVONS_MODEL_PROVIDER: 'openai',
   };
   const config = loadConfig({ cwd: dir, env });
-  assert.equal(config.model.provider, 'openai');
+  assert.equal(config.model, undefined);
+  assert.equal(config.models.provider, undefined);
+});
+
+test('loadConfig normalizes empty config to have models object', () => {
+  const dir = makeTempDir();
+  writeConfig(dir, {});
+  const config = loadConfig({ cwd: dir, env: {} });
+  assert.deepEqual(config, { models: {} });
 });

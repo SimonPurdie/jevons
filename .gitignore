@@ -1,7 +1,7 @@
 node_modules
 config/.env
+config/auth.json
 .geoff/
-data/
 memory/index/*.sqlite3
 memory/logs/**/*.md
 memory/pins/*.json

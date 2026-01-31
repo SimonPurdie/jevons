@@ -1,13 +1,14 @@
 const fs = require('fs');
 const path = require('path');
 
+// Only map non-secret env vars if needed. 
+// Secrets (API keys) are handled by AuthStorage or specific ENV vars loaded by the runtime/SDK.
 const ENV_MAP = {
   JEVONS_DISCORD_TOKEN: ['discord', 'token'],
   JEVONS_DISCORD_CHANNEL_ID: ['discord', 'channel_id'],
-  JEVONS_MODEL_PROVIDER: ['model', 'provider'],
-  JEVONS_MODEL_NAME: ['model', 'model'],
   JEVONS_REMINDERS_FILE_PATH: ['reminders', 'file_path'],
   JEVONS_REMINDERS_TIMEZONE: ['reminders', 'timezone'],
+  JEVONS_ACTIVE_MODEL: ['activeModel'],
 };
 
 function isPlainObject(value) {
@@ -102,13 +103,12 @@ function applyEnvOverrides(config, env) {
 function loadConfig(options = {}) {
   const cwd = options.cwd || process.cwd();
   const env = options.env || process.env;
-  let configPath = options.configPath || path.join(cwd, 'config', 'jevons.config.json');
-  if (!options.configPath && !fs.existsSync(configPath)) {
-    const legacyPath = path.join(cwd, 'config', 'config.json');
-    if (fs.existsSync(legacyPath)) {
-      configPath = legacyPath;
-    }
-  }
+  let configPath = options.configPath || path.join(cwd, 'config', 'config.json');
+
+  // Fallback to jevons.config.json if config.json logic was inverted in previous version, 
+  // but standardizing on config/config.json or config/jevons.config.json.
+  // Prioritizing config.json based on current usage.
+
   const envPath = options.envPath || path.join(cwd, 'config', '.env');
   const baseConfig = readConfigFile(configPath);
   const fileEnv = readEnvFile(envPath);
@@ -121,7 +121,22 @@ function loadConfig(options = {}) {
     }
   }
   const mergedEnv = { ...fileEnv, ...env };
-  return applyEnvOverrides(baseConfig, mergedEnv);
+
+  // Basic validation/normalization of models structure
+  const config = applyEnvOverrides(baseConfig, mergedEnv);
+
+  if (!config.models && !config.model) {
+    // If no models defined, create empty structure
+    config.models = {};
+  } else if (!config.models && config.model) {
+    // Migration compatibility: if user has old 'model' block but no 'models', 
+    // strictly they should update, but we can treat 'model' as 'default' for now 
+    // OR strictly ignore it as per "Remove legacy configuration support".
+    // I will ignore it to be strict as requested.
+    config.models = {};
+  }
+
+  return config;
 }
 
 module.exports = {

@@ -2,9 +2,20 @@
   "discord": {
     "channel_id": "1466871283160449155"
   },
-  "model": {
-    "provider": "google",
-    "model": "gemini-2.5-flash"
+  "activeModel": "primary",
+  "models": {
+    "primary": {
+      "provider": "google",
+      "model": "gemini-3-flash-preview"
+    },
+    "coding": {
+      "provider": "anthropic",
+      "model": "claude-3-5-sonnet"
+    },
+    "codex": {
+      "provider": "openai-codex",
+      "model": "gpt-4o"
+    }
   },
   "reminders": {
     "file_path": "/mnt/f/Obsidian-Vaults/Simon/Reminders.md",

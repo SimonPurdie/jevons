@@ -25,20 +25,21 @@ describe('Logging Integration', () => {
   it('should log structured events via logger', async () => {
     let capturedOnLog, capturedOnError;
     const mockRuntime = {
-      start: mock.fn(async () => {}),
+      start: mock.fn(async () => { }),
     };
     const mockScheduler = {
       start: mock.fn(),
       stop: mock.fn(),
     };
     const mockClient = {
-        channels: { fetch: async () => ({}) }
+      channels: { fetch: async () => ({}) }
     };
 
     const deps = {
       loadConfig: () => ({
         discord: { token: 'token', channel_id: 'channel' },
-        model: { provider: 'test', model: 'test' },
+        activeModel: 'test',
+        models: { test: { provider: 'test', model: 'test' } },
         reminders: { file_path: 'reminders.md' },
       }),
       createDiscordClient: () => mockClient,
@@ -54,7 +55,7 @@ describe('Logging Integration', () => {
       }),
       createIpcServer: mock.fn(() => ({
         start: async () => 12345,
-        stop: async () => {},
+        stop: async () => { },
       })),
     };
 
