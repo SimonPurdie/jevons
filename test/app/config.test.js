@@ -20,8 +20,8 @@ function writeConfig(dir, data) {
 test('loadConfig returns default structure when config file missing', () => {
   const dir = makeTempDir();
   const config = loadConfig({ cwd: dir, env: {} });
-  // Expect models: {} by default now
-  assert.deepEqual(config, { models: {} });
+  // Expect models: [] by default now
+  assert.deepEqual(config, { models: [] });
 });
 
 test('loadConfig reads config/config.json when present', () => {
@@ -35,22 +35,27 @@ test('loadConfig reads config/config.json when present', () => {
   };
   writeConfig(dir, data);
   const config = loadConfig({ cwd: dir, env: {} });
-  assert.deepEqual(config, data);
+  // models object is converted to array
+  assert.deepEqual(config, {
+    discord: { token: 'file-token', channel_id: '123' },
+    activeModel: 'primary',
+    models: [{ provider: 'google', model: 'gemini-1.5-flash' }]
+  });
 });
 
 test('loadConfig applies environment overrides', () => {
   const dir = makeTempDir();
   const data = {
-    discord: { token: 'file-token', channel_id: '123' },
+    discord: { channel_id: '123' },
     activeModel: 'primary',
   };
   writeConfig(dir, data);
   const env = {
-    JEVONS_DISCORD_TOKEN: 'env-token',
     JEVONS_ACTIVE_MODEL: 'coding',
+    JEVONS_DISCORD_CHANNEL_ID: '456',
   };
   const config = loadConfig({ cwd: dir, env });
-  assert.equal(config.discord.token, 'env-token');
+  assert.equal(config.discord.channel_id, '456');
   assert.equal(config.activeModel, 'coding');
 });
 
@@ -70,5 +75,5 @@ test('loadConfig normalizes empty config to have models object', () => {
   const dir = makeTempDir();
   writeConfig(dir, {});
   const config = loadConfig({ cwd: dir, env: {} });
-  assert.deepEqual(config, { models: {} });
+  assert.deepEqual(config, { models: [] });
 });

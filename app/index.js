@@ -50,8 +50,9 @@ async function startDiscordRuntime(deps = {}) {
   const memoryConfig = config.memory || {};
   const remindersConfig = config.reminders || {};
 
-  if (!discordConfig.token) {
-    throw new Error('Discord token missing in config');
+  const token = process.env.JEVONS_DISCORD_TOKEN || discordConfig.token;
+  if (!token) {
+    throw new Error('Discord token missing in config (set JEVONS_DISCORD_TOKEN env var)');
   }
   if (!discordConfig.channel_id) {
     throw new Error('Discord channel_id missing in config');
@@ -86,7 +87,7 @@ async function startDiscordRuntime(deps = {}) {
 
   const runtime = _createDiscordRuntime({
     client,
-    token: discordConfig.token,
+    token: token,
     channelId: discordConfig.channel_id,
     activeModel: config.activeModel,
     models: config.models,

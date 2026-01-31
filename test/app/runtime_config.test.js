@@ -13,10 +13,10 @@ class MockDiscordClient {
 
 test('createDiscordRuntime with activeModel resolves correctly', async () => {
     const client = new MockDiscordClient();
-    const models = {
-        primary: { provider: 'test-provider', model: 'test-model' }
-    };
-    const activeModel = 'primary';
+    const models = [
+        { provider: 'test-provider', model: 'test-model' }
+    ];
+    const activeModel = 'test-provider/test-model';
 
     let getModelCalled = false;
     const mockGetModel = (provider, model) => {
@@ -43,10 +43,10 @@ test('createDiscordRuntime with activeModel resolves correctly', async () => {
 
 test('createDiscordRuntime throws error if activeModel not found', async () => {
     const client = new MockDiscordClient();
-    const models = {
-        primary: { provider: 'test-provider', model: 'test-model' }
-    };
-    const activeModel = 'missing';
+    const models = [
+        { provider: 'test-provider', model: 'test-model' }
+    ];
+    const activeModel = 'missing/model';
 
     assert.throws(() => {
         createDiscordRuntime({
@@ -58,14 +58,14 @@ test('createDiscordRuntime throws error if activeModel not found', async () => {
             sendMessage: () => { },
             deps: { resolvePiAi: () => ({ getModel: () => { } }) }
         });
-    }, /No active model configuration found/);
+    }, /Unknown model/);
 });
 
 test('createDiscordRuntime uses authStorage in generateReply (indirectly verified via model resolution here)', async () => {
     // authStorage is used in generateReply, which is internal.
     // We can verify it is accepted in options without error.
     const client = new MockDiscordClient();
-    const models = { primary: { provider: 'p', model: 'm' } };
+    const models = [{ provider: 'p', model: 'm' }];
 
     const authStorage = {
         getApiKey: async () => 'key'
@@ -75,7 +75,7 @@ test('createDiscordRuntime uses authStorage in generateReply (indirectly verifie
         client,
         token: 'token',
         channelId: 'channel',
-        activeModel: 'primary',
+        activeModel: 'p/m',
         models,
         authStorage,
         getModel: () => ({ id: 'm' }),

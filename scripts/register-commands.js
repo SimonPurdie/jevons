@@ -6,8 +6,9 @@ async function registerCommands() {
     const config = loadConfig();
     const discordConfig = config.discord || {};
 
-    if (!discordConfig.token || !discordConfig.application_id) {
-        console.error('Error: "token" and "application_id" are required in config.json under "discord".');
+    const token = process.env.JEVONS_DISCORD_TOKEN || discordConfig.token;
+    if (!token || !discordConfig.application_id) {
+        console.error('Error: "token" (or JEVONS_DISCORD_TOKEN env var) and "application_id" are required in config.json under "discord".');
         process.exit(1);
     }
 

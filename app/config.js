@@ -4,7 +4,6 @@ const path = require('path');
 // Only map non-secret env vars if needed. 
 // Secrets (API keys) are handled by AuthStorage or specific ENV vars loaded by the runtime/SDK.
 const ENV_MAP = {
-  JEVONS_DISCORD_TOKEN: ['discord', 'token'],
   JEVONS_DISCORD_CHANNEL_ID: ['discord', 'channel_id'],
   JEVONS_REMINDERS_FILE_PATH: ['reminders', 'file_path'],
   JEVONS_REMINDERS_TIMEZONE: ['reminders', 'timezone'],
