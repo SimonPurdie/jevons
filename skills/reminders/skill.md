@@ -37,7 +37,7 @@ Example: `node skills/reminders/delete.js rid_K5V4M2J9Q2ZP`
 - All times are **Europe/London**.
 - The scheduler scans the file once per minute.
 - One-off reminders (`recur=none`) are automatically deleted after firing.
-- **Confirmation:** The helper scripts will automatically send a confirmation message to Discord via IPC. You will see a `SUCCESS: Message sent to Discord: ...` message in the tool output if this succeeds.
-- **Response:** If the script successfully sends the message, do NOT repeat the confirmation. Instead, provide a very brief acknowledgement like "Reminder set." or "Updated." to avoid double-posting.
+- **Confirmation:** The helper scripts will automatically send a confirmation message to Discord via IPC. You will see a `SUCCESS: Message sent to Discord: ...` message in the tool output if this succeeds. The user will see a message like "Set reminder: Make cocoa at 00:03 on 2026-01-31"
+- **Response:** If the script successfully sends the message, don't repeat the confirmation. Instead, you can provide a brief acknowledgement or comment, in keeping with your character.
 - **IDs:** The scripts output the reminder ID to `stderr` (visible as a separate line in tool results). Keep this for your internal memory/context so you can manage the reminder later, but **do not include it** in your message to the user.
 - **Recurrence:** The word "recurring" is only included in the output if the reminder is not a one-off.
