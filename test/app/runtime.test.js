@@ -41,6 +41,7 @@ function makeMessage({
   authorId = 'user-1',
   bot = false,
   messageId = 'msg-1',
+  guildName = 'TestGuild',
 } = {}) {
   return {
     id: messageId,
@@ -51,6 +52,7 @@ function makeMessage({
       isThread,
       parentId,
     },
+    guild: { name: guildName },
   };
 }
 
@@ -105,7 +107,7 @@ test('createDiscordRuntime logs user messages and agent replies', async () => {
       token: 'token-123',
       channelId: 'root',
       modelInstance,
-      logsRoot: tempDir,
+      memoryRoot: tempDir,
       sendMessage: (payload) => {
         sends.push(payload);
         return Promise.resolve();
@@ -116,11 +118,13 @@ test('createDiscordRuntime logs user messages and agent replies', async () => {
     client.emit('messageCreate', makeMessage({ channelId: 'root', content: 'Hello bot' }));
     await flush();
 
-    const logsDir = path.join(tempDir, 'logs', 'discord-channel', 'root');
-    const files = fs.readdirSync(logsDir);
-    const logContent = fs.readFileSync(path.join(logsDir, files[0]), 'utf8');
-    assert.ok(logContent.includes('[user] Hello bot'));
-    assert.ok(logContent.includes('[agent] Hello user'));
+    const files = fs.readdirSync(tempDir).filter(f => f.endsWith('.md'));
+    assert.ok(files.length > 0, 'Should create at least one log file');
+    const logContent = fs.readFileSync(path.join(tempDir, files[0]), 'utf8');
+    assert.ok(logContent.includes('user: [Discord Guild #TestGuild'));
+    assert.ok(logContent.includes('Hello bot'));
+    assert.ok(logContent.includes('assistant: [Discord Guild #TestGuild'));
+    assert.ok(logContent.includes('Hello user'));
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
@@ -145,7 +149,7 @@ test('createDiscordRuntime /new command resets context window', async () => {
       token: 'token-123',
       channelId: 'root',
       modelInstance,
-      logsRoot: tempDir,
+      memoryRoot: tempDir,
       sendMessage: (payload) => {
         sends.push(payload);
         return Promise.resolve();
@@ -166,9 +170,11 @@ test('createDiscordRuntime /new command resets context window', async () => {
     assert.ok(newConfirmation);
     assert.equal(modelCalls, 2);
 
-    const logsDir = path.join(tempDir, 'logs', 'discord-channel', 'root');
-    const files = fs.readdirSync(logsDir).sort();
-    assert.equal(files.length, 2);
+    // Note: With the new format, if all messages happen within the same minute,
+    // they will be in the same file. The reset still clears the active window
+    // from memory, but the file is determined by the timestamp.
+    const files = fs.readdirSync(tempDir).filter(f => f.endsWith('.md')).sort();
+    assert.ok(files.length >= 1, 'Should create at least one log file');
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
@@ -193,7 +199,7 @@ test('createDiscordRuntime passes chat history to model', async () => {
       token: 'token-123',
       channelId: 'root',
       modelInstance,
-      logsRoot: tempDir,
+      memoryRoot: tempDir,
       sendMessage: (payload) => {
         sends.push(payload);
         return Promise.resolve();

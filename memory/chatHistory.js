@@ -60,7 +60,7 @@ class ChatHistoryWindow {
    * Format a log entry as a chat message.
    *
    * @param {Object} entry - Log entry from readAllLogEntries
-   * @param {string} entry.role - 'user' or 'agent'
+   * @param {string} entry.role - 'user' or 'assistant'
    * @param {string} entry.content - Message content
    * @returns {Object} Formatted message { role: string, content: string }
    */
@@ -112,9 +112,9 @@ class ChatHistoryWindow {
       return [];
     }
 
-    // Filter to only user and agent roles (exclude system/tool messages)
+    // Filter to only user and assistant/agent roles (exclude system/tool messages)
     const relevantEntries = entries.filter(
-      (entry) => entry.role === 'user' || entry.role === 'agent'
+      (entry) => entry.role === 'user' || entry.role === 'assistant' || entry.role === 'agent'
     );
 
     // Take most recent messages up to maxHistoryMessages

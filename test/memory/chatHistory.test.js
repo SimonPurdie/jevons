@@ -22,14 +22,18 @@ function cleanupTempDir(tempDir) {
 
 function createLogFile(tempDir, entries) {
   const logPath = path.join(tempDir, 'test.log.md');
-  let content = '# Context Window: test\n# Started: 20260130T142355Z\n# Sequence: 0\n\n';
+  let content = '# Session: 2026-01-30 14:23 GMT\n\n';
   for (const entry of entries) {
-    const metadata = entry.metadata
-      ? ` (${Object.entries(entry.metadata)
-          .map(([k, v]) => `${k}=${JSON.stringify(v)}`)
-          .join(' ')})`
-      : '';
-    content += `- **${entry.timestamp || '2026-01-30T14:24:00.000Z'}** [${entry.role}] ${entry.content}${metadata}\n`;
+    const role = entry.role === 'user' ? 'user' : 'assistant';
+    const timestamp = entry.timestamp || '2026-01-30T14:24:00.000Z';
+    const date = new Date(timestamp);
+    const localTime = date.toISOString().slice(0, 16).replace('T', ' ');
+    const timeStr = localTime.slice(0, 10) + ' ' + localTime.slice(11, 16);
+    
+    content += `${role}: [Discord Guild #TestGuild channel id:123 +0m ${timeStr} GMT] author:\n${entry.content}\n`;
+    if (entry.messageId) {
+      content += `[message_id: ${entry.messageId}]\n`;
+    }
   }
   fs.writeFileSync(logPath, content, 'utf8');
   return logPath;

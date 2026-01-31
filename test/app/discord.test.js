@@ -50,6 +50,7 @@ test('extractContext returns channel context', () => {
     threadId: null,
     contextId: 'root',
     isThread: false,
+    guildName: 'Unknown',
   });
 });
 
@@ -65,6 +66,7 @@ test('extractContext returns thread context for matching parent', () => {
     threadId: 'thread-1',
     contextId: 'thread-1',
     isThread: true,
+    guildName: 'Unknown',
   });
 });
 

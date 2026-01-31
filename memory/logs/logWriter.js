@@ -1,111 +1,143 @@
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
+/**
+ * Format a date for entry timestamp (ISO format)
+ */
 function formatTimestamp(date = new Date()) {
   return date.toISOString();
 }
 
+/**
+ * Format a date for filename using local time: YYYY-MM-DD-hhmm
+ */
 function formatWindowTimestamp(date = new Date()) {
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(date.getUTCDate()).padStart(2, '0');
-  const hours = String(date.getUTCHours()).padStart(2, '0');
-  const minutes = String(date.getUTCMinutes()).padStart(2, '0');
-  const seconds = String(date.getUTCSeconds()).padStart(2, '0');
-  return `${year}${month}${day}T${hours}${minutes}${seconds}Z`;
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}-${hours}${minutes}`;
 }
 
-function getSequenceNumber(logsDir, contextId, windowTimestamp) {
-  if (!fs.existsSync(logsDir)) {
-    return 0;
-  }
-  const files = fs.readdirSync(logsDir);
-  let maxSeq = -1;
-  const prefix = `${windowTimestamp}_`;
-  for (const file of files) {
-    if (file.startsWith(prefix) && file.endsWith('.md')) {
-      const seqPart = file.slice(prefix.length, -3);
-      const seq = parseInt(seqPart, 10);
-      if (!isNaN(seq) && seq > maxSeq) {
-        maxSeq = seq;
-      }
-    }
-  }
-  return maxSeq + 1;
+/**
+ * Get default memory root directory: ~/jevons/memory/
+ */
+function getDefaultMemoryRoot() {
+  const homeDir = os.homedir();
+  return path.join(homeDir, 'jevons', 'memory');
 }
 
-function resolveLogPath(logsRoot, surface, contextId, windowTimestamp, seq) {
-  const logsDir = path.join(logsRoot, 'logs', surface, contextId);
-  const seqStr = String(seq).padStart(4, '0');
+/**
+ * Resolve log file path in flat structure: ~/jevons/memory/YYYY-MM-DD-hhmm.md
+ */
+function resolveLogPath(memoryRoot, windowTimestamp) {
+  const logPath = path.join(memoryRoot, `${windowTimestamp}.md`);
   return {
-    dir: logsDir,
-    path: path.join(logsDir, `${windowTimestamp}_${seqStr}.md`),
+    dir: memoryRoot,
+    path: logPath,
   };
+}
+
+/**
+ * Format a local timestamp for Discord context: YYYY-MM-DD hh:mm GMT
+ */
+function formatLocalDiscordTimestamp(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day} ${hours}:${minutes}`;
+}
+
+/**
+ * Calculate time offset in minutes from window start
+ */
+function getTimeOffset(windowStart, entryTime) {
+  const diffMs = entryTime.getTime() - windowStart.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  return diffMins > 0 ? `+${diffMins}m` : `${diffMins}m`;
 }
 
 function createLogWriter(options) {
   const {
-    logsRoot,
-    surface,
-    contextId,
+    memoryRoot,
     windowTimestamp,
-    seq,
+    context,
   } = options || {};
 
-  if (!logsRoot) {
-    throw new Error('logsRoot is required');
-  }
-  if (!surface) {
-    throw new Error('surface is required');
-  }
-  if (!contextId) {
-    throw new Error('contextId is required');
+  if (!memoryRoot) {
+    throw new Error('memoryRoot is required');
   }
   if (!windowTimestamp) {
     throw new Error('windowTimestamp is required');
   }
-  if (typeof seq !== 'number') {
-    throw new Error('seq is required');
+  if (!context) {
+    throw new Error('context is required (must include surface, contextId, guildName)');
   }
 
-  const { dir: logsDir, path: logPath } = resolveLogPath(
-    logsRoot,
-    surface,
-    contextId,
-    windowTimestamp,
-    seq
-  );
+  const { dir: logsDir, path: logPath } = resolveLogPath(memoryRoot, windowTimestamp);
 
+  // Ensure memory directory exists
   if (!fs.existsSync(logsDir)) {
     fs.mkdirSync(logsDir, { recursive: true });
   }
 
-  // Write header to claim the file/sequence number
+  const windowStartDate = new Date();
+  // Parse window timestamp to get start date
+  const [year, month, day, hourMin] = windowTimestamp.split('-');
+  const hours = hourMin.slice(0, 2);
+  const mins = hourMin.slice(2);
+  windowStartDate.setFullYear(parseInt(year));
+  windowStartDate.setMonth(parseInt(month) - 1);
+  windowStartDate.setDate(parseInt(day));
+  windowStartDate.setHours(parseInt(hours));
+  windowStartDate.setMinutes(parseInt(mins));
+  windowStartDate.setSeconds(0);
+  windowStartDate.setMilliseconds(0);
+
+  // Write simple header if file doesn't exist
   if (!fs.existsSync(logPath)) {
-    fs.writeFileSync(logPath, `# Context Window: ${surface}/${contextId}\n` +
-      `# Started: ${windowTimestamp}\n` +
-      `# Sequence: ${seq}\n\n`, 'utf8');
+    fs.writeFileSync(logPath, `# Session: ${formatLocalDiscordTimestamp(windowStartDate)} GMT\n\n`, 'utf8');
   }
 
   function append(entry) {
-    const timestamp = entry.timestamp || formatTimestamp();
-    const role = entry.role;
-    const content = (entry.content || '').replace(/\n/g, '\\n');
-    const metadata = entry.metadata;
-
-    let line = `- **${timestamp}** [${role}] ${content}`;
-    if (metadata) {
-      const metaStr = Object.entries(metadata)
-        .map(([k, v]) => `${k}=${JSON.stringify(v)}`)
-        .join(' ');
-      line += ` (${metaStr})`;
+    const entryTime = entry.timestamp ? new Date(entry.timestamp) : new Date();
+    const role = entry.role === 'user' ? 'user' : 'assistant';
+    const content = (entry.content || '');
+    
+    // Format Discord context line similar to clawd examples
+    // [Discord Guild #<guild> channel id:<channel-id> +<offset>m <local-time> GMT] <author>:
+    const offset = getTimeOffset(windowStartDate, entryTime);
+    const localTime = formatLocalDiscordTimestamp(entryTime);
+    const authorName = entry.authorName || (role === 'user' ? 'user' : 'assistant');
+    const guildName = context.guildName || 'Unknown';
+    const contextId = context.contextId || 'unknown';
+    
+    let line = `${role}: [Discord Guild #${guildName} ${context.surface} id:${contextId} ${offset} ${localTime} GMT] ${authorName}:\n`;
+    
+    // Add content with proper indentation for multi-line
+    const contentLines = content.split('\n');
+    for (const contentLine of contentLines) {
+      line += `${contentLine}\n`;
     }
-    line += '\n';
-
+    
+    // Add message_id if available (minimal metadata)
+    if (entry.messageId) {
+      line += `[message_id: ${entry.messageId}]\n`;
+    }
+    
     fs.appendFileSync(logPath, line, 'utf8');
+    
+    // Count lines for return value
+    const fileContent = fs.readFileSync(logPath, 'utf8');
+    const lineCount = fileContent.split('\n').length;
+    
     return {
       path: logPath,
-      line: fs.readFileSync(logPath, 'utf8').split('\n').length - 1,
+      line: lineCount,
     };
   }
 
@@ -116,29 +148,29 @@ function createLogWriter(options) {
 }
 
 function createContextWindowResolver(options) {
-  const { logsRoot } = options || {};
-  if (!logsRoot) {
-    throw new Error('logsRoot is required');
+  const { memoryRoot } = options || {};
+  if (!memoryRoot) {
+    throw new Error('memoryRoot is required');
   }
 
   const activeWindows = new Map();
 
-  function getOrCreateContextWindow(surface, contextId, timestamp = new Date()) {
+  function getOrCreateContextWindow(surface, contextId, context, timestamp = new Date()) {
     const key = `${surface}:${contextId}`;
     if (activeWindows.has(key)) {
       return activeWindows.get(key);
     }
 
     const windowTimestamp = formatWindowTimestamp(timestamp);
-    const logsDir = path.join(logsRoot, 'logs', surface, contextId);
-    const seq = getSequenceNumber(logsDir, contextId, windowTimestamp);
 
     const writer = createLogWriter({
-      logsRoot,
-      surface,
-      contextId,
+      memoryRoot,
       windowTimestamp,
-      seq,
+      context: {
+        surface,
+        contextId,
+        guildName: context?.guildName || 'Unknown',
+      },
     });
 
     activeWindows.set(key, writer);
@@ -150,9 +182,9 @@ function createContextWindowResolver(options) {
     activeWindows.delete(key);
   }
 
-  function resetContextWindow(surface, contextId, timestamp = new Date()) {
+  function resetContextWindow(surface, contextId, context, timestamp = new Date()) {
     endContextWindow(surface, contextId);
-    return getOrCreateContextWindow(surface, contextId, timestamp);
+    return getOrCreateContextWindow(surface, contextId, context, timestamp);
   }
 
   return {
@@ -168,6 +200,7 @@ module.exports = {
   createContextWindowResolver,
   formatTimestamp,
   formatWindowTimestamp,
-  getSequenceNumber,
+  formatLocalDiscordTimestamp,
+  getDefaultMemoryRoot,
   resolveLogPath,
 };

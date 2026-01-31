@@ -10,12 +10,15 @@ function extractContext(message, rootChannelId) {
     return null;
   }
 
+  const guildName = message.guild ? message.guild.name : 'Unknown';
+
   if (channel.id === rootChannelId) {
     return {
       channelId: channel.id,
       threadId: null,
       contextId: channel.id,
       isThread: false,
+      guildName,
     };
   }
 
@@ -25,6 +28,7 @@ function extractContext(message, rootChannelId) {
       threadId: channel.id,
       contextId: channel.id,
       isThread: true,
+      guildName,
     };
   }
 

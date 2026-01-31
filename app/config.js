@@ -6,7 +6,6 @@ const ENV_MAP = {
   JEVONS_DISCORD_CHANNEL_ID: ['discord', 'channel_id'],
   JEVONS_MODEL_PROVIDER: ['model', 'provider'],
   JEVONS_MODEL_NAME: ['model', 'model'],
-  JEVONS_MEMORY_LOGS_ROOT: ['memory', 'logs_root'],
   JEVONS_REMINDERS_FILE_PATH: ['reminders', 'file_path'],
   JEVONS_REMINDERS_TIMEZONE: ['reminders', 'timezone'],
 };

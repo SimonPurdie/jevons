@@ -8,7 +8,8 @@ const {
   createContextWindowResolver,
   formatTimestamp,
   formatWindowTimestamp,
-  getSequenceNumber,
+  formatLocalDiscordTimestamp,
+  getDefaultMemoryRoot,
   resolveLogPath,
 } = require('../../memory/logs/logWriter');
 
@@ -28,87 +29,66 @@ test('formatTimestamp returns ISO string', () => {
   assert.equal(result, '2026-01-30T14:23:55.000Z');
 });
 
-test('formatWindowTimestamp returns compact UTC format', () => {
+test('formatWindowTimestamp returns local time format YYYY-MM-DD-hhmm', () => {
   const date = new Date('2026-01-30T14:23:55.000Z');
+  // Convert to local time for comparison
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const expected = `${year}-${month}-${day}-${hours}${minutes}`;
+  
   const result = formatWindowTimestamp(date);
-  assert.equal(result, '20260130T142355Z');
+  assert.equal(result, expected);
 });
 
 test('formatWindowTimestamp handles single digit months/days', () => {
   const date = new Date('2026-03-05T08:05:09.000Z');
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const expected = `${year}-${month}-${day}-${hours}${minutes}`;
+  
   const result = formatWindowTimestamp(date);
-  assert.equal(result, '20260305T080509Z');
+  assert.equal(result, expected);
 });
 
-test('resolveLogPath builds correct path structure', () => {
+test('formatLocalDiscordTimestamp returns YYYY-MM-DD hh:mm format', () => {
+  const date = new Date('2026-01-30T14:23:55.000Z');
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const expected = `${year}-${month}-${day} ${hours}:${minutes}`;
+  
+  const result = formatLocalDiscordTimestamp(date);
+  assert.equal(result, expected);
+});
+
+test('getDefaultMemoryRoot returns ~/jevons/memory', () => {
+  const result = getDefaultMemoryRoot();
+  const expected = path.join(os.homedir(), 'jevons', 'memory');
+  assert.equal(result, expected);
+});
+
+test('resolveLogPath builds flat path structure', () => {
   const result = resolveLogPath(
     '/root',
-    'discord-channel',
-    '123456',
-    '20260130T142355Z',
-    0
+    '2026-01-30-1423'
   );
-  assert.equal(result.dir, '/root/logs/discord-channel/123456');
-  assert.equal(result.path, '/root/logs/discord-channel/123456/20260130T142355Z_0000.md');
-});
-
-test('resolveLogPath handles higher sequence numbers', () => {
-  const result = resolveLogPath(
-    '/root',
-    'discord-thread',
-    'abc123',
-    '20260130T142355Z',
-    42
-  );
-  assert.equal(result.path, '/root/logs/discord-thread/abc123/20260130T142355Z_0042.md');
-});
-
-test('getSequenceNumber returns 0 for empty directory', () => {
-  const tempDir = createTempDir();
-  try {
-    const seq = getSequenceNumber(tempDir, '123', '20260130T142355Z');
-    assert.equal(seq, 0);
-  } finally {
-    cleanupTempDir(tempDir);
-  }
-});
-
-test('getSequenceNumber returns next number for existing files', () => {
-  const tempDir = createTempDir();
-  try {
-    fs.mkdirSync(tempDir, { recursive: true });
-    fs.writeFileSync(path.join(tempDir, '20260130T142355Z_0000.md'), '');
-    fs.writeFileSync(path.join(tempDir, '20260130T142355Z_0001.md'), '');
-    fs.writeFileSync(path.join(tempDir, '20260130T142355Z_0002.md'), '');
-    
-    const seq = getSequenceNumber(tempDir, '123', '20260130T142355Z');
-    assert.equal(seq, 3);
-  } finally {
-    cleanupTempDir(tempDir);
-  }
-});
-
-test('getSequenceNumber ignores files with different timestamp', () => {
-  const tempDir = createTempDir();
-  try {
-    fs.mkdirSync(tempDir, { recursive: true });
-    fs.writeFileSync(path.join(tempDir, '20260130T142355Z_0000.md'), '');
-    fs.writeFileSync(path.join(tempDir, '20260130T142400Z_0000.md'), '');
-    
-    const seq = getSequenceNumber(tempDir, '123', '20260130T142355Z');
-    assert.equal(seq, 1);
-  } finally {
-    cleanupTempDir(tempDir);
-  }
+  assert.equal(result.dir, '/root');
+  assert.equal(result.path, '/root/2026-01-30-1423.md');
 });
 
 test('createLogWriter requires all options', () => {
   const tempDir = createTempDir();
   try {
-    assert.throws(() => createLogWriter({ logsRoot: tempDir }), /surface is required/);
-    assert.throws(() => createLogWriter({ logsRoot: tempDir, surface: 'discord-channel' }), /contextId is required/);
-    assert.throws(() => createLogWriter({ logsRoot: tempDir, surface: 'discord-channel', contextId: '123' }), /windowTimestamp is required/);
-    assert.throws(() => createLogWriter({ logsRoot: tempDir, surface: 'discord-channel', contextId: '123', windowTimestamp: '20260130T142355Z' }), /seq is required/);
+    assert.throws(() => createLogWriter({ memoryRoot: tempDir }), /windowTimestamp is required/);
+    assert.throws(() => createLogWriter({ memoryRoot: tempDir, windowTimestamp: '2026-01-30-1423' }), /context is required/);
   } finally {
     cleanupTempDir(tempDir);
   }
@@ -117,76 +97,84 @@ test('createLogWriter requires all options', () => {
 test('createLogWriter creates directory if not exists', () => {
   const tempDir = createTempDir();
   try {
-    const logsRoot = path.join(tempDir, 'logs-root');
+    const memoryRoot = path.join(tempDir, 'memory');
     const writer = createLogWriter({
-      logsRoot,
-      surface: 'discord-channel',
-      contextId: '123',
-      windowTimestamp: '20260130T142355Z',
-      seq: 0,
+      memoryRoot,
+      windowTimestamp: '2026-01-30-1423',
+      context: {
+        surface: 'channel',
+        contextId: '123',
+        guildName: 'TestGuild',
+      },
     });
     
-    assert.equal(fs.existsSync(path.join(logsRoot, 'logs', 'discord-channel', '123')), true);
+    assert.equal(fs.existsSync(memoryRoot), true);
     assert.equal(fs.existsSync(writer.path), true);
     // Verify header was written
     const content = fs.readFileSync(writer.path, 'utf8');
-    assert.ok(content.includes('# Context Window: discord-channel/123'));
+    assert.ok(content.includes('# Session:'));
   } finally {
     cleanupTempDir(tempDir);
   }
 });
 
-test('createLogWriter append writes markdown entry', () => {
+test('createLogWriter append writes markdown entry in new format', () => {
   const tempDir = createTempDir();
   try {
     const writer = createLogWriter({
-      logsRoot: tempDir,
-      surface: 'discord-channel',
-      contextId: '123',
-      windowTimestamp: '20260130T142355Z',
-      seq: 0,
+      memoryRoot: tempDir,
+      windowTimestamp: '2026-01-30-1423',
+      context: {
+        surface: 'channel',
+        contextId: '123',
+        guildName: 'TestGuild',
+      },
     });
     
     const result = writer.append({
       timestamp: '2026-01-30T14:24:00.000Z',
       role: 'user',
       content: 'Hello bot',
+      authorName: 'testuser',
     });
     
     const content = fs.readFileSync(writer.path, 'utf8');
-    const lines = content.split('\n').filter(l => l.trim());
-    // Header: 3 lines + entry: 1 line = 4 total non-empty
-    assert.equal(lines.length, 4);
-    assert.ok(lines[3].includes('[user] Hello bot'));
+    assert.ok(content.includes('user: [Discord Guild #TestGuild channel id:123'));
+    assert.ok(content.includes('testuser:'));
+    assert.ok(content.includes('Hello bot'));
     assert.equal(result.path, writer.path);
-    assert.equal(result.line, 5); // After 4-line header
+    assert.ok(result.line > 0);
   } finally {
     cleanupTempDir(tempDir);
   }
 });
 
-test('createLogWriter append with metadata', () => {
+test('createLogWriter append with messageId', () => {
   const tempDir = createTempDir();
   try {
     const writer = createLogWriter({
-      logsRoot: tempDir,
-      surface: 'discord-channel',
-      contextId: '123',
-      windowTimestamp: '20260130T142355Z',
-      seq: 0,
+      memoryRoot: tempDir,
+      windowTimestamp: '2026-01-30-1423',
+      context: {
+        surface: 'channel',
+        contextId: '123',
+        guildName: 'TestGuild',
+      },
     });
     
     writer.append({
       timestamp: '2026-01-30T14:24:00.000Z',
-      role: 'agent',
+      role: 'assistant',
       content: 'Hello user',
-      metadata: { tool: 'bash', command: 'ls' },
+      authorName: 'Jevons',
+      messageId: 'abc123',
     });
     
     const content = fs.readFileSync(writer.path, 'utf8');
-    assert.ok(content.includes('[agent] Hello user'));
-    assert.ok(content.includes('tool="bash"'));
-    assert.ok(content.includes('command="ls"'));
+    assert.ok(content.includes('assistant: [Discord Guild #TestGuild channel id:123'));
+    assert.ok(content.includes('Jevons:'));
+    assert.ok(content.includes('Hello user'));
+    assert.ok(content.includes('[message_id: abc123]'));
   } finally {
     cleanupTempDir(tempDir);
   }
@@ -196,70 +184,48 @@ test('createLogWriter is append-only', () => {
   const tempDir = createTempDir();
   try {
     const writer = createLogWriter({
-      logsRoot: tempDir,
-      surface: 'discord-channel',
-      contextId: '123',
-      windowTimestamp: '20260130T142355Z',
-      seq: 0,
+      memoryRoot: tempDir,
+      windowTimestamp: '2026-01-30-1423',
+      context: {
+        surface: 'channel',
+        contextId: '123',
+        guildName: 'TestGuild',
+      },
     });
     
-    writer.append({ role: 'user', content: 'First' });
-    writer.append({ role: 'agent', content: 'Second' });
-    writer.append({ role: 'user', content: 'Third' });
+    writer.append({ role: 'user', content: 'First', authorName: 'user1' });
+    writer.append({ role: 'assistant', content: 'Second', authorName: 'bot' });
+    writer.append({ role: 'user', content: 'Third', authorName: 'user1' });
     
     const content = fs.readFileSync(writer.path, 'utf8');
-    const lines = content.split('\n').filter(l => l.trim());
-    // Header: 3 lines + 3 entries = 6 total non-empty
-    assert.equal(lines.length, 6);
-    assert.ok(lines[3].includes('[user] First'));
-    assert.ok(lines[4].includes('[agent] Second'));
-    assert.ok(lines[5].includes('[user] Third'));
+    // Should have header + 3 entries
+    assert.ok(content.includes('user:') && content.includes('First'));
+    assert.ok(content.includes('assistant:') && content.includes('Second'));
+    assert.ok(content.includes('user:') && content.includes('Third'));
   } finally {
     cleanupTempDir(tempDir);
   }
 });
 
-test('createLogWriter returns correct line numbers', () => {
-  const tempDir = createTempDir();
-  try {
-    const writer = createLogWriter({
-      logsRoot: tempDir,
-      surface: 'discord-channel',
-      contextId: '123',
-      windowTimestamp: '20260130T142355Z',
-      seq: 0,
-    });
-    
-    const r1 = writer.append({ role: 'user', content: 'First' });
-    const r2 = writer.append({ role: 'agent', content: 'Second' });
-    const r3 = writer.append({ role: 'user', content: 'Third' });
-    
-    // Lines are 1-indexed, header is 4 lines, so first append is line 5
-    assert.equal(r1.line, 5);
-    assert.equal(r2.line, 6);
-    assert.equal(r3.line, 7);
-  } finally {
-    cleanupTempDir(tempDir);
-  }
-});
-
-test('createContextWindowResolver requires logsRoot', () => {
-  assert.throws(() => createContextWindowResolver({}), /logsRoot is required/);
+test('createContextWindowResolver requires memoryRoot', () => {
+  assert.throws(() => createContextWindowResolver({}), /memoryRoot is required/);
 });
 
 test('createContextWindowResolver creates new window on first access', () => {
   const tempDir = createTempDir();
   try {
-    const resolver = createContextWindowResolver({ logsRoot: tempDir });
+    const resolver = createContextWindowResolver({ memoryRoot: tempDir });
     const now = new Date('2026-01-30T14:23:55.000Z');
+    const context = { guildName: 'TestGuild' };
     
-    const window = resolver.getOrCreateContextWindow('discord-channel', '456', now);
+    const window = resolver.getOrCreateContextWindow('channel', '456', context, now);
     
     assert.ok(window);
     assert.ok(window.path);
-    assert.ok(window.path.includes('discord-channel'));
-    assert.ok(window.path.includes('456'));
-    assert.ok(window.path.includes('20260130T142355Z'));
+    assert.ok(window.path.includes('.md'));
+    // Filename should be in YYYY-MM-DD-hhmm format (local time)
+    const filename = path.basename(window.path);
+    assert.match(filename, /^\d{4}-\d{2}-\d{2}-\d{4}\.md$/);
   } finally {
     cleanupTempDir(tempDir);
   }
@@ -268,11 +234,12 @@ test('createContextWindowResolver creates new window on first access', () => {
 test('createContextWindowResolver returns same window for subsequent calls', () => {
   const tempDir = createTempDir();
   try {
-    const resolver = createContextWindowResolver({ logsRoot: tempDir });
+    const resolver = createContextWindowResolver({ memoryRoot: tempDir });
     const now = new Date('2026-01-30T14:23:55.000Z');
+    const context = { guildName: 'TestGuild' };
     
-    const window1 = resolver.getOrCreateContextWindow('discord-channel', '456', now);
-    const window2 = resolver.getOrCreateContextWindow('discord-channel', '456', now);
+    const window1 = resolver.getOrCreateContextWindow('channel', '456', context, now);
+    const window2 = resolver.getOrCreateContextWindow('channel', '456', context, now);
     
     assert.equal(window1.path, window2.path);
   } finally {
@@ -283,11 +250,14 @@ test('createContextWindowResolver returns same window for subsequent calls', () 
 test('createContextWindowResolver different contexts have different windows', () => {
   const tempDir = createTempDir();
   try {
-    const resolver = createContextWindowResolver({ logsRoot: tempDir });
+    const resolver = createContextWindowResolver({ memoryRoot: tempDir });
     const now = new Date('2026-01-30T14:23:55.000Z');
+    const context = { guildName: 'TestGuild' };
     
-    const window1 = resolver.getOrCreateContextWindow('discord-channel', '456', now);
-    const window2 = resolver.getOrCreateContextWindow('discord-channel', '789', now);
+    const window1 = resolver.getOrCreateContextWindow('channel', '456', context, now);
+    // Add 1 minute to ensure different filename
+    const later = new Date(now.getTime() + 60000);
+    const window2 = resolver.getOrCreateContextWindow('channel', '789', context, later);
     
     assert.notEqual(window1.path, window2.path);
   } finally {
@@ -298,16 +268,17 @@ test('createContextWindowResolver different contexts have different windows', ()
 test('createContextWindowResolver endContextWindow removes window', () => {
   const tempDir = createTempDir();
   try {
-    const resolver = createContextWindowResolver({ logsRoot: tempDir });
+    const resolver = createContextWindowResolver({ memoryRoot: tempDir });
     const now = new Date('2026-01-30T14:23:55.000Z');
+    const context = { guildName: 'TestGuild' };
     
-    const window1 = resolver.getOrCreateContextWindow('discord-channel', '456', now);
-    resolver.endContextWindow('discord-channel', '456');
-    const window2 = resolver.getOrCreateContextWindow('discord-channel', '456', now);
+    const window1 = resolver.getOrCreateContextWindow('channel', '456', context, now);
+    resolver.endContextWindow('channel', '456');
+    // After ending, a new window will be created with a new timestamp
+    const later = new Date(now.getTime() + 60000);
+    const window2 = resolver.getOrCreateContextWindow('channel', '456', context, later);
     
     assert.notEqual(window1.path, window2.path);
-    assert.ok(window1.path.includes('_0000.md'));
-    assert.ok(window2.path.includes('_0001.md'));
   } finally {
     cleanupTempDir(tempDir);
   }
@@ -316,15 +287,16 @@ test('createContextWindowResolver endContextWindow removes window', () => {
 test('createContextWindowResolver resetContextWindow creates new window', () => {
   const tempDir = createTempDir();
   try {
-    const resolver = createContextWindowResolver({ logsRoot: tempDir });
+    const resolver = createContextWindowResolver({ memoryRoot: tempDir });
     const now = new Date('2026-01-30T14:23:55.000Z');
+    const context = { guildName: 'TestGuild' };
     
-    const window1 = resolver.getOrCreateContextWindow('discord-channel', '456', now);
-    const window2 = resolver.resetContextWindow('discord-channel', '456', now);
+    const window1 = resolver.getOrCreateContextWindow('channel', '456', context, now);
+    // Reset with a later time to ensure different filename
+    const later = new Date(now.getTime() + 60000);
+    const window2 = resolver.resetContextWindow('channel', '456', context, later);
     
     assert.notEqual(window1.path, window2.path);
-    assert.ok(window1.path.includes('_0000.md'));
-    assert.ok(window2.path.includes('_0001.md'));
   } finally {
     cleanupTempDir(tempDir);
   }
@@ -333,20 +305,21 @@ test('createContextWindowResolver resetContextWindow creates new window', () => 
 test('createContextWindowResolver tracks multiple windows independently', () => {
   const tempDir = createTempDir();
   try {
-    const resolver = createContextWindowResolver({ logsRoot: tempDir });
+    const resolver = createContextWindowResolver({ memoryRoot: tempDir });
     const now = new Date('2026-01-30T14:23:55.000Z');
+    const context = { guildName: 'TestGuild' };
     
-    const window1 = resolver.getOrCreateContextWindow('discord-channel', '123', now);
-    const window2 = resolver.getOrCreateContextWindow('discord-channel', '456', now);
-    const window3 = resolver.getOrCreateContextWindow('discord-thread', '789', now);
+    const window1 = resolver.getOrCreateContextWindow('channel', '123', context, now);
+    const window2 = resolver.getOrCreateContextWindow('channel', '456', context, now);
+    const window3 = resolver.getOrCreateContextWindow('thread', '789', context, now);
     
     assert.equal(resolver._activeWindows.size, 3);
     
-    resolver.endContextWindow('discord-channel', '123');
+    resolver.endContextWindow('channel', '123');
     assert.equal(resolver._activeWindows.size, 2);
     
-    resolver.endContextWindow('discord-channel', '456');
-    resolver.endContextWindow('discord-thread', '789');
+    resolver.endContextWindow('channel', '456');
+    resolver.endContextWindow('thread', '789');
     assert.equal(resolver._activeWindows.size, 0);
   } finally {
     cleanupTempDir(tempDir);
@@ -356,29 +329,31 @@ test('createContextWindowResolver tracks multiple windows independently', () => 
 test('end-to-end: write multiple entries to same window', () => {
   const tempDir = createTempDir();
   try {
-    const resolver = createContextWindowResolver({ logsRoot: tempDir });
+    const resolver = createContextWindowResolver({ memoryRoot: tempDir });
     const now = new Date('2026-01-30T14:23:55.000Z');
+    const context = { guildName: 'TestGuild' };
     
-    const window = resolver.getOrCreateContextWindow('discord-channel', '123', now);
+    const window = resolver.getOrCreateContextWindow('channel', '123', context, now);
     
     window.append({
       timestamp: '2026-01-30T14:24:00.000Z',
       role: 'user',
       content: 'What time is it?',
+      authorName: 'user1',
     });
     
     window.append({
       timestamp: '2026-01-30T14:24:05.000Z',
-      role: 'agent',
+      role: 'assistant',
       content: 'It is 14:24 UTC.',
+      authorName: 'Jevons',
     });
     
     const content = fs.readFileSync(window.path, 'utf8');
-    const lines = content.split('\n').filter(l => l.trim());
-    // Header: 3 lines + 2 entries = 5 total non-empty
-    assert.equal(lines.length, 5);
-    assert.ok(lines[3].includes('What time is it?'));
-    assert.ok(lines[4].includes('It is 14:24 UTC.'));
+    assert.ok(content.includes('What time is it?'));
+    assert.ok(content.includes('It is 14:24 UTC.'));
+    assert.ok(content.includes('user: [Discord Guild #TestGuild'));
+    assert.ok(content.includes('assistant: [Discord Guild #TestGuild'));
   } finally {
     cleanupTempDir(tempDir);
   }

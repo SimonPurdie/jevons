@@ -380,7 +380,7 @@ function createDiscordRuntime(options) {
     sendMessage,
     onReady,
     onError,
-    logsRoot,
+    memoryRoot,
     skillsDir,
     skillPlaceholders = {},
     ipcPort,
@@ -407,8 +407,8 @@ function createDiscordRuntime(options) {
     }
   }
 
-  // Set up context window resolver for logging if logsRoot is provided
-  const windowResolver = logsRoot ? createContextWindowResolver({ logsRoot }) : null;
+  // Set up context window resolver for logging if memoryRoot is provided
+  const windowResolver = memoryRoot ? createContextWindowResolver({ memoryRoot }) : null;
 
   function getSurfaceFromContext(contextId, threadId) {
     return threadId ? 'discord-thread' : 'discord-channel';
@@ -419,21 +419,32 @@ function createDiscordRuntime(options) {
       return;
     }
     const surface = getSurfaceFromContext(payload.contextId, payload.threadId);
-    const window = windowResolver.getOrCreateContextWindow(surface, payload.contextId);
+    const context = {
+      surface,
+      contextId: payload.contextId,
+      guildName: payload.guildName || 'Unknown',
+    };
+    const window = windowResolver.getOrCreateContextWindow(surface, payload.contextId, context);
     window.append({
       timestamp: new Date().toISOString(),
       role,
       content,
-      metadata: metadata || undefined,
+      authorName: metadata?.authorName || (role === 'user' ? 'user' : 'assistant'),
+      messageId: metadata?.messageId,
     });
   }
 
-  function getChatHistoryForContext(contextId, threadId) {
+  function getChatHistoryForContext(contextId, threadId, guildName) {
     if (!windowResolver) {
       return [];
     }
     const surface = getSurfaceFromContext(contextId, threadId);
-    const window = windowResolver.getOrCreateContextWindow(surface, contextId);
+    const context = {
+      surface,
+      contextId,
+      guildName: guildName || 'Unknown',
+    };
+    const window = windowResolver.getOrCreateContextWindow(surface, contextId, context);
     // Read history from the current window's log file
     return readChatHistory(window.path);
   }
@@ -473,7 +484,12 @@ function createDiscordRuntime(options) {
         if (isNewCommand(payload.content)) {
           if (windowResolver) {
             const surface = getSurfaceFromContext(payload.contextId, payload.threadId);
-            windowResolver.resetContextWindow(surface, payload.contextId);
+            const context = {
+              surface,
+              contextId: payload.contextId,
+              guildName: payload.guildName || 'Unknown',
+            };
+            windowResolver.resetContextWindow(surface, payload.contextId, context);
           }
           try {
             await sendMessage({
@@ -493,11 +509,11 @@ function createDiscordRuntime(options) {
         }
 
         // Get chat history for this context BEFORE logging current message
-        const chatHistory = getChatHistoryForContext(payload.contextId, payload.threadId);
+        const chatHistory = getChatHistoryForContext(payload.contextId, payload.threadId, payload.guildName);
 
         // Log user message
         logEvent(payload, 'user', payload.content, {
-          authorId: payload.authorId,
+          authorName: payload.authorName || 'user',
           messageId: payload.messageId,
         });
 
@@ -526,8 +542,8 @@ function createDiscordRuntime(options) {
           const errorMessage = formatModelError(err);
           // Log error as agent response with error metadata
           logEvent(payload, 'agent', errorMessage, {
-            error: true,
-            errorType: 'model',
+            authorName: 'assistant',
+            messageId: payload.messageId,
           });
           try {
             await sendMessage({
@@ -554,7 +570,10 @@ function createDiscordRuntime(options) {
         }
 
         // Log agent reply before sending
-        logEvent(payload, 'agent', reply);
+        logEvent(payload, 'agent', reply, {
+          authorName: 'assistant',
+          messageId: payload.messageId,
+        });
 
         try {
           await sendMessage({
