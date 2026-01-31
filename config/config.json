@@ -4,7 +4,7 @@
   },
   "model": {
     "provider": "google",
-    "model": "gemini-2.5-flash-lite"
+    "model": "gemini-3-flash-preview"
   },
   "memory": {
     "logs_root": "data",
