@@ -1,11 +1,7 @@
 const { createDiscordBot } = require('./discord');
 const { createContextWindowResolver } = require('../memory/logs/logWriter');
-const { formatMemoryInjection } = require('../memory/index/injection');
-const { retrieveMemories } = require('../memory/index/retrieval');
-const { generateEmbedding } = require('../memory/index/embeddings');
 const { readLogEntry } = require('../memory/logs/logReader');
 const { readChatHistory } = require('../memory/chatHistory');
-const { createPinsManager } = require('../memory/pins/pins');
 const { loadSkill } = require('../skills/loader');
 const { createBashTool } = require('./tools/bash');
 
@@ -314,7 +310,7 @@ function normalizeHistoryMessages(history, modelInstance) {
   });
 }
 
-async function generateReply(payload, modelInstance, completeFn, options = {}) {
+async function generateReply(payload, modelInstance, options = {}) {
   if (!payload || typeof payload.content !== 'string') {
     return null;
   }
@@ -323,31 +319,17 @@ async function generateReply(payload, modelInstance, completeFn, options = {}) {
     return null;
   }
 
-  let injectionText = null;
-  let content = trimmed;
-  const injectionFn = options.injection;
-  if (typeof injectionFn === 'function') {
-    const injected = await injectionFn(trimmed, payload);
-    if (injected) {
-      injectionText = injected;
-    }
-  }
-
   const timeInjection = formatCurrentTime();
-  if (injectionText) {
-    content = `${injectionText}\n${timeInjection}\n${trimmed}`;
-  } else {
-    content = `${timeInjection}\n${trimmed}`;
-  }
+  const content = `${timeInjection}\n${trimmed}`;
 
-  const { Agent } = await resolvePiAgentCore();
+  const { Agent: AgentClass } = options.Agent ? { Agent: options.Agent } : await (options.resolvePiAgentCore || resolvePiAgentCore)();
 
   const workspaceFileNames = ['AGENTS.md', 'SOUL.md', 'TOOLS.md', 'IDENTITY.md', 'USER.md'];
   const workspaceFilesContent = readWorkspaceFiles(workspaceFileNames, '/home/simon/jevons');
   const systemPrompt = buildSystemPrompt(options.skills, workspaceFilesContent);
   const historyMessages = normalizeHistoryMessages(options.chatHistory || [], modelInstance);
 
-  const agent = new Agent({
+  const agent = new AgentClass({
     initialState: {
       systemPrompt,
       model: modelInstance,
@@ -385,64 +367,6 @@ async function generateReply(payload, modelInstance, completeFn, options = {}) {
   return reply;
 }
 
-function createMemoryInjectionProvider(options = {}) {
-  const {
-    indexPath,
-    embeddingApiKey,
-    embeddingModel,
-    embedder,
-    retriever,
-    logReader,
-    injectorOptions,
-    maxMemories,
-    onError,
-  } = options;
-
-  const canEmbed = typeof embedder === 'function' || embeddingApiKey;
-  const canRetrieve = typeof retriever === 'function' || indexPath;
-  if (!canEmbed || !canRetrieve) {
-    return null;
-  }
-
-  const embed = embedder || ((text) => generateEmbedding(text, {
-    apiKey: embeddingApiKey,
-    embeddingModel,
-  }));
-  const retrieve = retriever || ((embedding, retrieveOptions) => retrieveMemories(embedding, {
-    dbPath: indexPath,
-    ...retrieveOptions,
-  }));
-  const readEntry = logReader || ((path, line) => readLogEntry(path, line));
-
-  return async function getInjection(trimmed) {
-    try {
-      const queryEmbedding = await embed(trimmed);
-      const retrieved = await retrieve(queryEmbedding, { limit: maxMemories });
-      if (!retrieved || retrieved.length === 0) {
-        return null;
-      }
-
-      const hydrated = retrieved.map((memory) => {
-        if (memory && typeof memory.content === 'string') {
-          return memory;
-        }
-        const entry = readEntry(memory.path, memory.line);
-        return {
-          ...memory,
-          content: entry ? entry.content : '',
-        };
-      });
-
-      return formatMemoryInjection(hydrated, injectorOptions);
-    } catch (error) {
-      if (typeof onError === 'function') {
-        onError(error);
-      }
-      return null;
-    }
-  };
-}
-
 function createDiscordRuntime(options) {
   const {
     client,
@@ -453,24 +377,19 @@ function createDiscordRuntime(options) {
     providers,
     modelInstance,
     getModel: getModelOverride,
-    completeSimple: completeSimpleOverride,
     sendMessage,
     onReady,
     onError,
     logsRoot,
-    memoryIndexPath,
-    memoryInjection,
-    memoryEmbedder,
-    memoryRetriever,
-    memoryLogReader,
-    memoryInjectorOptions,
-    memoryMaxMemories,
-    embeddingApiKey,
-    embeddingModel,
     skillsDir,
     skillPlaceholders = {},
     ipcPort,
+    deps = {},
   } = options || {};
+
+  const _Agent = deps.Agent;
+  const _resolvePiAi = deps.resolvePiAi || resolvePiAi;
+  const _resolvePiAgentCore = deps.resolvePiAgentCore || resolvePiAgentCore;
 
   if (typeof sendMessage !== 'function') {
     throw new Error('sendMessage callback is required');
@@ -523,47 +442,23 @@ function createDiscordRuntime(options) {
     throw new Error('model provider and model name are required');
   }
 
-  const memoryInjectionProvider = typeof memoryInjection === 'function'
-    ? memoryInjection
-    : createMemoryInjectionProvider({
-      indexPath: memoryIndexPath,
-      embeddingApiKey,
-      embeddingModel,
-      embedder: memoryEmbedder,
-      retriever: memoryRetriever,
-      logReader: memoryLogReader,
-      injectorOptions: memoryInjectorOptions,
-      maxMemories: memoryMaxMemories,
-      onError,
-    });
-
   let resolvedModel = modelInstance;
-  let completeFn = completeSimpleOverride;
-  if (!resolvedModel || !completeFn) {
-    const piAi = resolvePiAi();
+  if (!resolvedModel) {
+    const piAi = _resolvePiAi();
     const getModelFn = getModelOverride || piAi.getModel;
     const getModelsFn = piAi.getModels;
+    resolvedModel = getModelFn(provider, model, providers);
     if (!resolvedModel) {
-      resolvedModel = getModelFn(provider, model, providers);
-      if (!resolvedModel) {
-        const available = typeof getModelsFn === 'function' ? getModelsFn(provider) : [];
-        const names = available.map((entry) => entry.id || entry);
-        const preview = names.slice(0, 10).join(', ');
-        const suffix = names.length > 10 ? '…' : '';
-        throw new Error(`Unknown model "${model}" for provider "${provider}". Available: ${preview}${suffix}`);
-      }
-    }
-    if (!completeFn) {
-      completeFn = piAi.completeSimple;
+      const available = typeof getModelsFn === 'function' ? getModelsFn(provider) : [];
+      const names = available.map((entry) => entry.id || entry);
+      const preview = names.slice(0, 10).join(', ');
+      const suffix = names.length > 10 ? '…' : '';
+      throw new Error(`Unknown model "${model}" for provider "${provider}". Available: ${preview}${suffix}`);
     }
   }
 
   function isNewCommand(content) {
     return typeof content === 'string' && content.trim() === '/new';
-  }
-
-  function isRememberCommand(content) {
-    return typeof content === 'string' && content.trim().startsWith('/remember');
   }
 
   const bot = createDiscordBot({
@@ -597,69 +492,6 @@ function createDiscordRuntime(options) {
           return;
         }
 
-        // Handle /remember command: pin the referenced message
-        if (isRememberCommand(payload.content)) {
-          // Extract the replied message ID if this is a reply
-          const repliedMessageId = payload.referencedMessageId || null;
-
-          const pinsManager = createPinsManager({
-            indexPath: memoryIndexPath,
-            logsRoot,
-          });
-
-          try {
-            const result = await pinsManager.handleRememberCommand(
-              payload.content,
-              repliedMessageId,
-              payload.contextId
-            );
-
-            // Log the pin action
-            logEvent(payload, 'agent', result.message, {
-              action: 'pin',
-              success: result.success,
-              pinnedMessageId: result.entry ? result.entry.id : null,
-            });
-
-            // Send confirmation to Discord
-            await sendMessage({
-              content: result.message,
-              channelId: payload.channelId,
-              threadId: payload.threadId,
-              contextId: payload.contextId,
-              messageId: payload.messageId,
-              authorId: payload.authorId,
-            });
-          } catch (err) {
-            const errorMessage = `Failed to pin message: ${err.message}`;
-            logEvent(payload, 'agent', errorMessage, {
-              action: 'pin',
-              success: false,
-              error: err.message,
-            });
-            try {
-              await sendMessage({
-                content: errorMessage,
-                channelId: payload.channelId,
-                threadId: payload.threadId,
-                contextId: payload.contextId,
-                messageId: payload.messageId,
-                authorId: payload.authorId,
-              });
-            } catch (sendErr) {
-              if (typeof onError === 'function') {
-                onError(sendErr);
-              }
-            }
-            if (typeof onError === 'function') {
-              onError(err);
-            }
-          } finally {
-            await pinsManager.close();
-          }
-          return;
-        }
-
         // Get chat history for this context BEFORE logging current message
         const chatHistory = getChatHistoryForContext(payload.contextId, payload.threadId);
 
@@ -683,11 +515,12 @@ function createDiscordRuntime(options) {
 
         let reply;
         try {
-          reply = await generateReply(payload, resolvedModel, completeFn, {
-            injection: memoryInjectionProvider,
+          reply = await generateReply(payload, resolvedModel, {
             chatHistory,
             skills: loadedSkills,
             tools: runtimeTools,
+            Agent: _Agent,
+            resolvePiAgentCore: _resolvePiAgentCore,
           });
         } catch (err) {
           const errorMessage = formatModelError(err);

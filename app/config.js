@@ -7,8 +7,6 @@ const ENV_MAP = {
   JEVONS_MODEL_PROVIDER: ['model', 'provider'],
   JEVONS_MODEL_NAME: ['model', 'model'],
   JEVONS_MEMORY_LOGS_ROOT: ['memory', 'logs_root'],
-  JEVONS_MEMORY_INDEX_PATH: ['memory', 'index_path'],
-  JEVONS_MEMORY_PINS_PATH: ['memory', 'pins_path'],
   JEVONS_REMINDERS_FILE_PATH: ['reminders', 'file_path'],
   JEVONS_REMINDERS_TIMEZONE: ['reminders', 'timezone'],
 };

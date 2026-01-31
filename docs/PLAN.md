@@ -27,20 +27,13 @@
 - [x] Implement event log writer (append-only markdown, per context window); add tests for format and immutability behavior.
 - [x] Implement log naming rules and path resolver; add tests for timestamp/seq uniqueness.
 - [x] Implement /new command to end a context window and reset per-window chat history; add tests around state reset.
-- [x] Implement embedding generation (Google provider, async queue, retry/backoff); add tests for retry states and status transitions.
-- [x] Implement SQLite embeddings index schema + CRUD; add tests for insert/query/migration.
-- [x] Implement embedding reconciliation job (find missing embeddings, enqueue); add tests for coverage.
-- [x] Implement memory retrieval (similarity + recency + MMR + pinned-first); add tests for ranking outcomes.
-- [x] Implement memory injection (JSON schema + token heuristics, injected-before-prompt); add tests for truncation and budgets.
 - [x] Implement prompt-side chat history windowing (per context window, injected before user prompt); add tests for history ordering and /new reset behavior.
 
---- Tracer B: memory UX expansion
+--- Tracer B: skills
 
-- Tracer B is "done" when: /remember pins a message and pinned memories are boosted in retrieval on the next turn, with tests covering precedence and storage.
+- Tracer B is "done" when: skills can be executed via bash, with tests covering script invocation and error handling.
 
-- [x] Implement pinned memory flow (/remember command + storage + retrieval boost); add tests for precedence.
 - [x] Implement skills loader + execution via bash; add tests for script invocation and error handling.
-- [x] Implement minimal CLI harness (stateless, no history); add tests for parity with Discord core behaviors.
 
 --- Tracer C: reminders and scheduler
 
