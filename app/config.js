@@ -144,4 +144,18 @@ module.exports = {
   readConfigFile,
   applyEnvOverrides,
   readEnvFile,
+  saveConfig,
 };
+
+function saveConfig(config, options = {}) {
+  const cwd = options.cwd || process.cwd();
+  const configPath = options.configPath || path.join(cwd, 'config', 'config.json');
+
+  // Ensure directory exists
+  const dir = path.dirname(configPath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
+}

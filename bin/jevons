@@ -1,13 +1,28 @@
 #!/usr/bin/env node
 
+if (process.argv.includes('--help')) {
+  console.log('Usage: jevons [options]');
+  console.log('');
+  console.log('Options:');
+  console.log('  --options     Start interactive configuration');
+  console.log('  --help        Show help');
+  process.exit(0);
+}
+
 const path = require('path');
-const { startDiscordRuntime } = require('../app/index.js');
-
 const appRoot = path.resolve(__dirname, '..');
-
 process.chdir(appRoot);
 
-startDiscordRuntime().catch((err) => {
-  console.error('Failed to start Discord runtime', err);
-  process.exitCode = 1;
-});
+if (process.argv.includes('--options')) {
+  const { runCLI } = require('../app/cli');
+  runCLI().catch(err => {
+    console.error('CLI error:', err);
+    process.exit(1);
+  });
+} else {
+  const { startDiscordRuntime } = require('../app/index.js');
+  startDiscordRuntime().catch((err) => {
+    console.error('Failed to start Discord runtime', err);
+    process.exitCode = 1;
+  });
+}
