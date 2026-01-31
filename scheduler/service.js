@@ -139,9 +139,14 @@ function createSchedulerService(options) {
   function start() {
     if (timer) return;
     log('Scheduler service started');
-    // Run immediately
-    scan();
-    timer = setInterval(scan, interval);
+
+    const now = new Date();
+    const msUntilNextMinute = (60 - now.getSeconds()) * 1000 - now.getMilliseconds() + 200;
+
+    timer = setTimeout(() => {
+      scan();
+      timer = setInterval(scan, interval);
+    }, msUntilNextMinute);
   }
 
   function stop() {
