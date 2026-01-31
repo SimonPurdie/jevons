@@ -1,0 +1,13 @@
+#!/usr/bin/env node
+
+const path = require('path');
+const { startDiscordRuntime } = require('../app/index.js');
+
+const appRoot = path.resolve(__dirname, '..');
+
+process.chdir(appRoot);
+
+startDiscordRuntime().catch((err) => {
+  console.error('Failed to start Discord runtime', err);
+  process.exitCode = 1;
+});

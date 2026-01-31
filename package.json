@@ -2,7 +2,9 @@
   "name": "jevons",
   "private": true,
   "type": "commonjs",
+  "bin": "./bin/jevons",
   "scripts": {
+    "start": "node app/index.js",
     "test": "node --test"
   },
   "dependencies": {
