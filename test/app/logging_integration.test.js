@@ -23,11 +23,13 @@ describe('Logging Integration', () => {
   });
 
   it('should log structured events via logger', async () => {
+    let capturedOnLog, capturedOnError;
     const mockRuntime = {
       start: mock.fn(async () => {}),
     };
     const mockScheduler = {
       start: mock.fn(),
+      stop: mock.fn(),
     };
     const mockClient = {
         channels: { fetch: async () => ({}) }
@@ -41,20 +43,27 @@ describe('Logging Integration', () => {
       }),
       createDiscordClient: () => mockClient,
       createDiscordRuntime: mock.fn((options) => {
-        // Trigger runtime callbacks
         options.onReady();
         options.onError(new Error('Test runtime error'));
         return mockRuntime;
       }),
       createSchedulerService: mock.fn((options) => {
-        // Trigger scheduler callbacks
-        options.onLog('Test scheduler log');
-        options.onError(new Error('Test scheduler error'));
+        capturedOnLog = options.onLog;
+        capturedOnError = options.onError;
         return mockScheduler;
       }),
+      createIpcServer: mock.fn(() => ({
+        start: async () => 12345,
+        stop: async () => {},
+      })),
     };
 
-    await startDiscordRuntime(deps);
+    const runtime = await startDiscordRuntime(deps);
+
+    capturedOnLog('Test scheduler log');
+    capturedOnError(new Error('Test scheduler error'));
+
+    await runtime.stop();
 
     const logs = consoleLogMock.mock.calls.map(c => c.arguments[0]);
     const errors = consoleErrorMock.mock.calls.map(c => c.arguments[0]);

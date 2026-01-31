@@ -97,12 +97,19 @@ function executeSkillScript(options = {}) {
     const childEnv = { ...process.env, ...env };
     const child = spawn('bash', [scriptPath, ...args], {
       env: childEnv,
-      timeout,
     });
 
     let stdout = '';
     let stderr = '';
     let killedByTimeout = false;
+    let timeoutHandle = null;
+
+    if (timeout > 0) {
+      timeoutHandle = setTimeout(() => {
+        killedByTimeout = true;
+        child.kill('SIGTERM');
+      }, timeout);
+    }
 
     child.stdout.on('data', (data) => {
       stdout += data.toString();
@@ -117,6 +124,7 @@ function executeSkillScript(options = {}) {
     });
 
     child.on('close', (code, signal) => {
+      if (timeoutHandle) clearTimeout(timeoutHandle);
       if (signal === 'SIGTERM' && killedByTimeout) {
         reject(new Error(`Script timed out after ${timeout}ms`));
         return;

@@ -4,6 +4,7 @@ const { createDiscordRuntime } = require('./runtime');
 const { createSchedulerService } = require('../scheduler/service');
 const { createIpcServer } = require('./ipc');
 const logger = require('./logger');
+const { getDefaultMemoryRoot } = require('../memory/logs/logWriter');
 
 function createDiscordClient() {
   return new Client({
@@ -83,10 +84,10 @@ async function startDiscordRuntime(deps = {}) {
     channelId: discordConfig.channel_id,
     provider: modelConfig.provider,
     model: modelConfig.model,
-    logsRoot: memoryConfig.logs_root,
     skillsDir: require('path').join(__dirname, '../skills'),
     sendMessage,
     ipcPort,
+    memoryRoot: memoryConfig.root || getDefaultMemoryRoot(),
     onReady: () => {
       logger.info('Discord runtime ready');
       if (remindersConfig.file_path) {
@@ -100,7 +101,14 @@ async function startDiscordRuntime(deps = {}) {
     },
   });
 
-  return runtime.start();
+  await runtime.start();
+
+  return {
+    stop: async () => {
+      await ipcServer.stop();
+      scheduler.stop();
+    },
+  };
 }
 
 module.exports = {
