@@ -379,7 +379,8 @@ async function generateReply(payload, modelInstance, completeFn, options = {}) {
       // return a default acknowledgement.
       return 'Action completed.';
     }
-    throw new Error('Model response missing content');
+    // Return lowkey indicator instead of throwing an error
+    return '...';
   }
   return reply;
 }
