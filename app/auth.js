@@ -5,7 +5,7 @@ const { getEnvApiKey, getOAuthApiKey, getOAuthProvider, getOAuthProviders } = re
 
 class AuthStorage {
     constructor(authPath) {
-        this.authPath = authPath || path.join(process.cwd(), 'data', 'auth.json');
+        this.authPath = authPath || path.join(process.cwd(), 'config', 'auth.json');
         this.data = {};
         this.runtimeOverrides = new Map();
         this.reload();
