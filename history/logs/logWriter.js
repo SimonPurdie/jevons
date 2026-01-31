@@ -22,20 +22,20 @@ function formatWindowTimestamp(date = new Date()) {
 }
 
 /**
- * Get default memory root directory: ~/jevons/memory/
+ * Get default history root directory: ~/jevons/history/
  */
-function getDefaultMemoryRoot() {
+function getDefaultHistoryRoot() {
   const homeDir = os.homedir();
-  return path.join(homeDir, 'jevons', 'memory');
+  return path.join(homeDir, 'jevons', 'history');
 }
 
 /**
- * Resolve log file path in flat structure: ~/jevons/memory/YYYY-MM-DD-hhmm.md
+ * Resolve log file path in flat structure: ~/jevons/history/YYYY-MM-DD-hhmm.md
  */
-function resolveLogPath(memoryRoot, windowTimestamp) {
-  const logPath = path.join(memoryRoot, `${windowTimestamp}.md`);
+function resolveLogPath(historyRoot, windowTimestamp) {
+  const logPath = path.join(historyRoot, `${windowTimestamp}.md`);
   return {
-    dir: memoryRoot,
+    dir: historyRoot,
     path: logPath,
   };
 }
@@ -63,13 +63,13 @@ function getTimeOffset(windowStart, entryTime) {
 
 function createLogWriter(options) {
   const {
-    memoryRoot,
+    historyRoot,
     windowTimestamp,
     context,
   } = options || {};
 
-  if (!memoryRoot) {
-    throw new Error('memoryRoot is required');
+  if (!historyRoot) {
+    throw new Error('historyRoot is required');
   }
   if (!windowTimestamp) {
     throw new Error('windowTimestamp is required');
@@ -78,9 +78,9 @@ function createLogWriter(options) {
     throw new Error('context is required (must include surface, contextId, guildName)');
   }
 
-  const { dir: logsDir, path: logPath } = resolveLogPath(memoryRoot, windowTimestamp);
+  const { dir: logsDir, path: logPath } = resolveLogPath(historyRoot, windowTimestamp);
 
-  // Ensure memory directory exists
+  // Ensure history directory exists
   if (!fs.existsSync(logsDir)) {
     fs.mkdirSync(logsDir, { recursive: true });
   }
@@ -148,9 +148,9 @@ function createLogWriter(options) {
 }
 
 function createContextWindowResolver(options) {
-  const { memoryRoot } = options || {};
-  if (!memoryRoot) {
-    throw new Error('memoryRoot is required');
+  const { historyRoot } = options || {};
+  if (!historyRoot) {
+    throw new Error('historyRoot is required');
   }
 
   const activeWindows = new Map();
@@ -164,7 +164,7 @@ function createContextWindowResolver(options) {
     const windowTimestamp = formatWindowTimestamp(timestamp);
 
     const writer = createLogWriter({
-      memoryRoot,
+      historyRoot,
       windowTimestamp,
       context: {
         surface,
@@ -201,6 +201,6 @@ module.exports = {
   formatTimestamp,
   formatWindowTimestamp,
   formatLocalDiscordTimestamp,
-  getDefaultMemoryRoot,
+  getDefaultHistoryRoot,
   resolveLogPath,
 };

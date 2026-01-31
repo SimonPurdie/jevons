@@ -1,7 +1,7 @@
 const { createDiscordBot } = require('./discord');
-const { createContextWindowResolver } = require('../memory/logs/logWriter');
-const { readLogEntry } = require('../memory/logs/logReader');
-const { readChatHistory } = require('../memory/chatHistory');
+const { createContextWindowResolver } = require('../history/logs/logWriter');
+const { readLogEntry } = require('../history/logs/logReader');
+const { readChatHistory } = require('../history/chatHistory');
 const { loadSkill } = require('../skills/loader');
 const { createBashTool } = require('./tools/bash');
 
@@ -388,7 +388,7 @@ function createDiscordRuntime(options) {
     sendMessage,
     onReady,
     onError,
-    memoryRoot,
+    historyRoot,
     skillsDir,
     ipcPort,
     deps = {},
@@ -415,8 +415,8 @@ function createDiscordRuntime(options) {
     }
   }
 
-  // Set up context window resolver for logging if memoryRoot is provided
-  const windowResolver = memoryRoot ? createContextWindowResolver({ memoryRoot }) : null;
+  // Set up context window resolver for logging if historyRoot is provided
+  const windowResolver = historyRoot ? createContextWindowResolver({ historyRoot }) : null;
 
   function getSurfaceFromContext(contextId, threadId) {
     return threadId ? 'discord-thread' : 'discord-channel';

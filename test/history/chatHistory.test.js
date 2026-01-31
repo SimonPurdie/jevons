@@ -8,7 +8,7 @@ const {
   createChatHistoryWindow,
   readChatHistory,
   DEFAULT_CONFIG,
-} = require('../../memory/chatHistory');
+} = require('../../history/chatHistory');
 
 function createTempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'jevons-chat-history-test-'));

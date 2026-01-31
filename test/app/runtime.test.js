@@ -107,7 +107,7 @@ test('createDiscordRuntime logs user messages and agent replies', async () => {
       token: 'token-123',
       channelId: 'root',
       modelInstance,
-      memoryRoot: tempDir,
+      historyRoot: tempDir,
       sendMessage: (payload) => {
         sends.push(payload);
         return Promise.resolve();
@@ -149,7 +149,7 @@ test('createDiscordRuntime /new command resets context window', async () => {
       token: 'token-123',
       channelId: 'root',
       modelInstance,
-      memoryRoot: tempDir,
+      historyRoot: tempDir,
       sendMessage: (payload) => {
         sends.push(payload);
         return Promise.resolve();
@@ -199,7 +199,7 @@ test('createDiscordRuntime passes chat history to model', async () => {
       token: 'token-123',
       channelId: 'root',
       modelInstance,
-      memoryRoot: tempDir,
+      historyRoot: tempDir,
       sendMessage: (payload) => {
         sends.push(payload);
         return Promise.resolve();

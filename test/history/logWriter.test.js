@@ -9,9 +9,9 @@ const {
   formatTimestamp,
   formatWindowTimestamp,
   formatLocalDiscordTimestamp,
-  getDefaultMemoryRoot,
+  getDefaultHistoryRoot,
   resolveLogPath,
-} = require('../../memory/logs/logWriter');
+} = require('../../history/logs/logWriter');
 
 function createTempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'jevons-test-'));
@@ -69,9 +69,9 @@ test('formatLocalDiscordTimestamp returns YYYY-MM-DD hh:mm format', () => {
   assert.equal(result, expected);
 });
 
-test('getDefaultMemoryRoot returns ~/jevons/memory', () => {
-  const result = getDefaultMemoryRoot();
-  const expected = path.join(os.homedir(), 'jevons', 'memory');
+test('getDefaultHistoryRoot returns ~/jevons/history', () => {
+  const result = getDefaultHistoryRoot();
+  const expected = path.join(os.homedir(), 'jevons', 'history');
   assert.equal(result, expected);
 });
 
@@ -87,8 +87,8 @@ test('resolveLogPath builds flat path structure', () => {
 test('createLogWriter requires all options', () => {
   const tempDir = createTempDir();
   try {
-    assert.throws(() => createLogWriter({ memoryRoot: tempDir }), /windowTimestamp is required/);
-    assert.throws(() => createLogWriter({ memoryRoot: tempDir, windowTimestamp: '2026-01-30-1423' }), /context is required/);
+    assert.throws(() => createLogWriter({ historyRoot: tempDir }), /windowTimestamp is required/);
+    assert.throws(() => createLogWriter({ historyRoot: tempDir, windowTimestamp: '2026-01-30-1423' }), /context is required/);
   } finally {
     cleanupTempDir(tempDir);
   }
@@ -97,9 +97,9 @@ test('createLogWriter requires all options', () => {
 test('createLogWriter creates directory if not exists', () => {
   const tempDir = createTempDir();
   try {
-    const memoryRoot = path.join(tempDir, 'memory');
+    const historyRoot = path.join(tempDir, 'history');
     const writer = createLogWriter({
-      memoryRoot,
+      historyRoot,
       windowTimestamp: '2026-01-30-1423',
       context: {
         surface: 'channel',
@@ -108,7 +108,7 @@ test('createLogWriter creates directory if not exists', () => {
       },
     });
     
-    assert.equal(fs.existsSync(memoryRoot), true);
+    assert.equal(fs.existsSync(historyRoot), true);
     assert.equal(fs.existsSync(writer.path), true);
     // Verify header was written
     const content = fs.readFileSync(writer.path, 'utf8');
@@ -122,7 +122,7 @@ test('createLogWriter append writes markdown entry in new format', () => {
   const tempDir = createTempDir();
   try {
     const writer = createLogWriter({
-      memoryRoot: tempDir,
+      historyRoot: tempDir,
       windowTimestamp: '2026-01-30-1423',
       context: {
         surface: 'channel',
@@ -153,7 +153,7 @@ test('createLogWriter append with messageId', () => {
   const tempDir = createTempDir();
   try {
     const writer = createLogWriter({
-      memoryRoot: tempDir,
+      historyRoot: tempDir,
       windowTimestamp: '2026-01-30-1423',
       context: {
         surface: 'channel',
@@ -184,7 +184,7 @@ test('createLogWriter is append-only', () => {
   const tempDir = createTempDir();
   try {
     const writer = createLogWriter({
-      memoryRoot: tempDir,
+      historyRoot: tempDir,
       windowTimestamp: '2026-01-30-1423',
       context: {
         surface: 'channel',
@@ -207,14 +207,14 @@ test('createLogWriter is append-only', () => {
   }
 });
 
-test('createContextWindowResolver requires memoryRoot', () => {
-  assert.throws(() => createContextWindowResolver({}), /memoryRoot is required/);
+test('createContextWindowResolver requires historyRoot', () => {
+  assert.throws(() => createContextWindowResolver({}), /historyRoot is required/);
 });
 
 test('createContextWindowResolver creates new window on first access', () => {
   const tempDir = createTempDir();
   try {
-    const resolver = createContextWindowResolver({ memoryRoot: tempDir });
+    const resolver = createContextWindowResolver({ historyRoot: tempDir });
     const now = new Date('2026-01-30T14:23:55.000Z');
     const context = { guildName: 'TestGuild' };
     
@@ -234,7 +234,7 @@ test('createContextWindowResolver creates new window on first access', () => {
 test('createContextWindowResolver returns same window for subsequent calls', () => {
   const tempDir = createTempDir();
   try {
-    const resolver = createContextWindowResolver({ memoryRoot: tempDir });
+    const resolver = createContextWindowResolver({ historyRoot: tempDir });
     const now = new Date('2026-01-30T14:23:55.000Z');
     const context = { guildName: 'TestGuild' };
     
@@ -250,7 +250,7 @@ test('createContextWindowResolver returns same window for subsequent calls', () 
 test('createContextWindowResolver different contexts have different windows', () => {
   const tempDir = createTempDir();
   try {
-    const resolver = createContextWindowResolver({ memoryRoot: tempDir });
+    const resolver = createContextWindowResolver({ historyRoot: tempDir });
     const now = new Date('2026-01-30T14:23:55.000Z');
     const context = { guildName: 'TestGuild' };
     
@@ -268,7 +268,7 @@ test('createContextWindowResolver different contexts have different windows', ()
 test('createContextWindowResolver endContextWindow removes window', () => {
   const tempDir = createTempDir();
   try {
-    const resolver = createContextWindowResolver({ memoryRoot: tempDir });
+    const resolver = createContextWindowResolver({ historyRoot: tempDir });
     const now = new Date('2026-01-30T14:23:55.000Z');
     const context = { guildName: 'TestGuild' };
     
@@ -287,7 +287,7 @@ test('createContextWindowResolver endContextWindow removes window', () => {
 test('createContextWindowResolver resetContextWindow creates new window', () => {
   const tempDir = createTempDir();
   try {
-    const resolver = createContextWindowResolver({ memoryRoot: tempDir });
+    const resolver = createContextWindowResolver({ historyRoot: tempDir });
     const now = new Date('2026-01-30T14:23:55.000Z');
     const context = { guildName: 'TestGuild' };
     
@@ -305,7 +305,7 @@ test('createContextWindowResolver resetContextWindow creates new window', () => 
 test('createContextWindowResolver tracks multiple windows independently', () => {
   const tempDir = createTempDir();
   try {
-    const resolver = createContextWindowResolver({ memoryRoot: tempDir });
+    const resolver = createContextWindowResolver({ historyRoot: tempDir });
     const now = new Date('2026-01-30T14:23:55.000Z');
     const context = { guildName: 'TestGuild' };
     
@@ -329,7 +329,7 @@ test('createContextWindowResolver tracks multiple windows independently', () => 
 test('end-to-end: write multiple entries to same window', () => {
   const tempDir = createTempDir();
   try {
-    const resolver = createContextWindowResolver({ memoryRoot: tempDir });
+    const resolver = createContextWindowResolver({ historyRoot: tempDir });
     const now = new Date('2026-01-30T14:23:55.000Z');
     const context = { guildName: 'TestGuild' };
     

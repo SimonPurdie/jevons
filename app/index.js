@@ -4,7 +4,7 @@ const { createDiscordRuntime } = require('./runtime');
 const { createSchedulerService } = require('../scheduler/service');
 const { createIpcServer } = require('./ipc');
 const logger = require('./logger');
-const { getDefaultMemoryRoot } = require('../memory/logs/logWriter');
+const { getDefaultHistoryRoot } = require('../history/logs/logWriter');
 const { AuthStorage } = require('./auth');
 const path = require('path');
 
@@ -47,7 +47,7 @@ async function startDiscordRuntime(deps = {}) {
 
   const config = _loadConfig();
   const discordConfig = config.discord || {};
-  const memoryConfig = config.memory || {};
+  const historyConfig = config.history || {};
   const remindersConfig = config.reminders || {};
 
   const token = process.env.JEVONS_DISCORD_TOKEN || discordConfig.token;
@@ -95,7 +95,7 @@ async function startDiscordRuntime(deps = {}) {
     skillsDir: path.join(__dirname, '../skills'),
     sendMessage,
     ipcPort,
-    memoryRoot: memoryConfig.root || getDefaultMemoryRoot(),
+    historyRoot: historyConfig.root || getDefaultHistoryRoot(),
     onReady: () => {
       logger.info('Discord runtime ready');
       if (remindersConfig.file_path) {

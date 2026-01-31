@@ -4,7 +4,7 @@
  * Migration script to convert old format logs to new format.
  * 
  * Old format: data/logs/discord-channel/<channel-id>/YYYYMMDDThhmmssZ_XXXX.md
- * New format: ~/jevons/memory/YYYY-MM-DD-hhmm.md
+ * New format: ~/jevons/history/YYYY-MM-DD-hhmm.md
  * 
  * Usage: node scripts/migrate-logs.js
  */
@@ -14,7 +14,7 @@ const path = require('path');
 const os = require('os');
 
 const OLD_LOGS_ROOT = path.join(process.cwd(), 'data', 'logs');
-const NEW_MEMORY_ROOT = path.join(os.homedir(), 'jevons', 'memory');
+const NEW_HISTORY_ROOT = path.join(os.homedir(), 'jevons', 'history');
 
 /**
  * Parse old format window timestamp (YYYYMMDDThhmmssZ) to local time
@@ -120,7 +120,7 @@ function migrateLogFile(oldPath, surface, contextId, guildName) {
   
   const oldTimestamp = timestampMatch[1];
   const newTimestamp = convertToNewFormat(oldTimestamp);
-  const newPath = path.join(NEW_MEMORY_ROOT, `${newTimestamp}.md`);
+  const newPath = path.join(NEW_HISTORY_ROOT, `${newTimestamp}.md`);
   
   // Check if target already exists (avoid duplicates)
   if (fs.existsSync(newPath)) {
@@ -152,10 +152,10 @@ function migrateAllLogs() {
     return;
   }
   
-  // Ensure new memory directory exists
-  if (!fs.existsSync(NEW_MEMORY_ROOT)) {
-    fs.mkdirSync(NEW_MEMORY_ROOT, { recursive: true });
-    console.log(`Created: ${NEW_MEMORY_ROOT}`);
+  // Ensure new history directory exists
+  if (!fs.existsSync(NEW_HISTORY_ROOT)) {
+    fs.mkdirSync(NEW_HISTORY_ROOT, { recursive: true });
+    console.log(`Created: ${NEW_HISTORY_ROOT}`);
   }
   
   // Find all old log files
@@ -193,7 +193,7 @@ function migrateAllLogs() {
 // Run migration
 console.log('Starting log migration...');
 console.log(`From: ${OLD_LOGS_ROOT}`);
-console.log(`To: ${NEW_MEMORY_ROOT}`);
+console.log(`To: ${NEW_HISTORY_ROOT}`);
 console.log('');
 
 migrateAllLogs();
@@ -201,5 +201,5 @@ migrateAllLogs();
 console.log('');
 console.log('Migration complete!');
 console.log(`\nNext steps:`);
-console.log(`1. Review the migrated files in ${NEW_MEMORY_ROOT}`);
+console.log(`1. Review the migrated files in ${NEW_HISTORY_ROOT}`);
 console.log(`2. Once satisfied, you can remove the old logs: rm -rf ${OLD_LOGS_ROOT}`);
