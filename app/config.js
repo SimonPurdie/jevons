@@ -125,16 +125,34 @@ function loadConfig(options = {}) {
   // Basic validation/normalization of models structure
   const config = applyEnvOverrides(baseConfig, mergedEnv);
 
-  if (!config.models && !config.model) {
-    // If no models defined, create empty structure
-    config.models = {};
-  } else if (!config.models && config.model) {
-    // Migration compatibility: if user has old 'model' block but no 'models', 
-    // strictly they should update, but we can treat 'model' as 'default' for now 
-    // OR strictly ignore it as per "Remove legacy configuration support".
-    // I will ignore it to be strict as requested.
-    config.models = {};
+  // Migration logic: convert models object to array
+  if (config.models && !Array.isArray(config.models)) {
+    const modelsArray = [];
+    for (const [key, details] of Object.entries(config.models)) {
+      if (details && details.provider && details.model) {
+        modelsArray.push({
+          provider: details.provider,
+          model: details.model
+        });
+      }
+    }
+    config.models = modelsArray;
   }
+
+  if (!config.models) {
+    config.models = [];
+  }
+
+  // Ensure activeModel is a string (provider/model)
+  if (config.activeModel && typeof config.activeModel === 'object') {
+    // If it was somehow an object from an old version
+    if (config.activeModel.provider && config.activeModel.model) {
+      config.activeModel = `${config.activeModel.provider}/${config.activeModel.model}`;
+    }
+  }
+
+  // If activeModel is still using a nickname (not and existing nickname but just in case)
+  // we will handle the resolution in runtime.js
 
   return config;
 }

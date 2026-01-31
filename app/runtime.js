@@ -465,19 +465,18 @@ function createDiscordRuntime(options) {
     let targetProvider;
     let targetModel;
 
-    if (activeModel && models && models[activeModel]) {
-      targetProvider = models[activeModel].provider;
-      targetModel = models[activeModel].model;
-    } else if (options.provider && options.model) {
-      // Fallback to direct options if provided (though deprecated in config)
-      targetProvider = options.provider;
-      targetModel = options.model;
+    if (activeModel && typeof activeModel === 'string' && activeModel.includes('/')) {
+      [targetProvider, targetModel] = activeModel.split('/');
+    } else if (Array.isArray(models) && models.length > 0) {
+      // Fallback to first model in list
+      targetProvider = models[0].provider;
+      targetModel = models[0].model;
     }
 
     if (!targetProvider || !targetModel) {
       // Construct a helpful error message
-      const configDebug = { activeModel, modelsKeys: models ? Object.keys(models) : [] };
-      throw new Error(`No active model configuration found. Please check config.json. Debug: ${JSON.stringify(configDebug)}`);
+      const configDebug = { activeModel, modelsLength: Array.isArray(models) ? models.length : 0 };
+      throw new Error(`No active model configuration found or activeModel format invalid. Please check config.json. Debug: ${JSON.stringify(configDebug)}`);
     }
 
     resolvedModel = getModelFn(targetProvider, targetModel, providers);
@@ -502,6 +501,29 @@ function createDiscordRuntime(options) {
     channelId,
     onReady,
     onError,
+    onInteraction: (payload) => {
+      (async () => {
+        if (payload.commandName === 'new') {
+          if (windowResolver) {
+            const surface = getSurfaceFromContext(payload.contextId, payload.threadId);
+            const context = {
+              surface,
+              contextId: payload.contextId,
+              guildName: payload.guildName || 'Unknown',
+            };
+            windowResolver.resetContextWindow(surface, payload.contextId, context);
+          }
+          try {
+            await payload.interaction.reply('Context window reset. Starting fresh conversation.');
+          } catch (err) {
+            if (typeof onError === 'function') {
+              onError(err);
+            }
+          }
+          return;
+        }
+      })();
+    },
     onMessage: (payload) => {
       (async () => {
         // Handle /new command: reset context window and confirm

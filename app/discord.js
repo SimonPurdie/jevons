@@ -4,13 +4,13 @@ function isThreadChannel(channel) {
   return Boolean(channel && channel.isThread);
 }
 
-function extractContext(message, rootChannelId) {
-  const channel = message.channel;
+function extractContext(messageOrInteraction, rootChannelId) {
+  const channel = messageOrInteraction.channel;
   if (!channel) {
     return null;
   }
 
-  const guildName = message.guild ? message.guild.name : 'Unknown';
+  const guildName = messageOrInteraction.guild ? messageOrInteraction.guild.name : 'Unknown';
 
   if (channel.id === rootChannelId) {
     return {
@@ -41,6 +41,7 @@ function createDiscordBot(options) {
     token,
     channelId,
     onMessage,
+    onInteraction,
     onReady,
     onError,
   } = options || {};
@@ -72,6 +73,25 @@ function createDiscordBot(options) {
   client.on('error', (err) => {
     if (typeof onError === 'function') {
       onError(err);
+    }
+  });
+
+  client.on('interactionCreate', async (interaction) => {
+    if (!interaction.isChatInputCommand()) return;
+
+    const context = extractContext(interaction, channelId);
+    if (!context) {
+      return;
+    }
+
+    if (typeof onInteraction === 'function') {
+      onInteraction({
+        commandName: interaction.commandName,
+        options: interaction.options,
+        authorId: interaction.user ? interaction.user.id : null,
+        interaction,
+        ...context,
+      });
     }
   });
 

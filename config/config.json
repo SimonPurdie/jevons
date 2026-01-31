@@ -1,22 +1,19 @@
 {
   "discord": {
-    "channel_id": "1466871283160449155"
+    "channel_id": "1466871283160449155",
+    "application_id": "1465731621196927210"
   },
-  "activeModel": "primary",
-  "models": {
-    "primary": {
+  "activeModel": "openai-codex/gpt-5.1-codex-mini",
+  "models": [
+    {
       "provider": "google",
       "model": "gemini-3-flash-preview"
     },
-    "coding": {
-      "provider": "anthropic",
-      "model": "claude-3-5-sonnet"
-    },
-    "codex": {
+    {
       "provider": "openai-codex",
-      "model": "gpt-4o"
+      "model": "gpt-5.1-codex-mini"
     }
-  },
+  ],
   "reminders": {
     "file_path": "/mnt/f/Obsidian-Vaults/Simon/Reminders.md",
     "timezone": "Europe/London",
