@@ -15,7 +15,7 @@ async function registerCommands() {
     const commands = [
         new SlashCommandBuilder()
             .setName('new')
-            .setDescription('Wipe current chat history and start a fresh context window'),
+            .setDescription('Start a fresh conversation (old session is preserved)'),
     ].map(command => command.toJSON());
 
     const rest = new REST({ version: '10' }).setToken(discordConfig.token);

@@ -67,7 +67,17 @@
   - **Test Coverage**: Session file creation/format, session recovery, corrupt file handling, multiple session recovery
 
 ## Phase C: Discord Command Implementation
-- [ ] **Step C.1**: Refactor `/new` command
+- [x] **Step C.1**: Refactor `/new` command
+  - **Implementation**: Updated `/new` command to use `SessionManager.newSession()` instead of old history system
+  - **Implementation**: Updated slash command description to match migration plan: "Start a fresh conversation (old session is preserved)"
+  - **Implementation**: Both slash command (`/new`) and text command (`/new`) properly create new sessions
+  - **Tests**: Created `test/app/commands/new.test.js` with 5 passing tests covering:
+    - Session creation and old session preservation
+    - Multiple `/new` commands creating distinct sessions
+    - Slash command interaction handling
+    - Empty session context after `/new`
+    - Listing old sessions preserved by `/new`
+  - **Note**: Confirmation message properly mentions `/resume` for accessing previous sessions
 - [ ] **Step C.2**: Implement `/resume` command
 - [ ] **Step C.3**: Implement `/compact` command
 - [ ] **Step C.4**: Implement `/fork` command
