@@ -82,29 +82,6 @@ function normalizePiAiMessages(messages, modelInstance) {
   });
 }
 
-function logContextToFile(context) {
-  const logsDir = path.join(process.cwd(), 'logs');
-  const contextPath = path.join(logsDir, 'context.txt');
-
-  try {
-    const logEntry = {
-      "systemPrompt": context.systemPrompt,
-      "model": context.model,
-      "tools": context.tools,
-      "messages": context.messages,
-      "prompt": {
-        "role": "user",
-        "content": context.userContent,
-        "timestamp": context.timestamp,
-      },
-    };
-
-    fs.writeFileSync(contextPath, JSON.stringify(logEntry, null, 2));
-  } catch (err) {
-    // Silently fail - logging should not interrupt bot operation
-  }
-}
-
 function logAgentInteraction(agent, userContent, timestamp) {
   const logsDir = path.join(process.cwd(), 'logs');
   const debugLogPath = path.join(logsDir, 'agent_debug.log');
@@ -307,15 +284,6 @@ export async function generateReply(payload, modelInstance, options = {}) {
       // Fallback or error
       throw new Error(`No API key found for provider "${provider}". Check .env or auth.json.`);
     }
-  });
-
-  logContextToFile({
-    systemPrompt,
-    model: modelInstance,
-    tools: Array.isArray(options.tools) ? options.tools : [],
-    messages: historyMessages,
-    userContent: content,
-    timestamp: Date.now(),
   });
 
   // Persist user message to session before prompting
