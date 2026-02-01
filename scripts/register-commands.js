@@ -19,6 +19,13 @@ async function registerCommands() {
         new SlashCommandBuilder()
             .setName('resume')
             .setDescription('Resume a previous conversation session'),
+        new SlashCommandBuilder()
+            .setName('compact')
+            .setDescription('Summarize older messages to reduce context size')
+            .addStringOption(option =>
+                option.setName('instructions')
+                    .setDescription('Optional: Custom focus for the summary')
+                    .setRequired(false)),
     ].map(command => command.toJSON());
 
     const rest = new REST({ version: '10' }).setToken(discordConfig.token);

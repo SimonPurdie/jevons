@@ -1,6 +1,7 @@
 import { createDiscordBot, sendDiscordMessage } from './discord.js';
 import { StringSelectMenuBuilder, ActionRowBuilder } from 'discord.js';
 import { DiscordSessionManager } from './sessionManager.js';
+import { performCompaction } from './compaction.js';
 import { loadSkill } from '../skills/loader.js';
 import { createBashTool } from './tools/bash.js';
 import fs from 'fs';
@@ -579,6 +580,10 @@ export function createDiscordRuntime(options) {
     return typeof content === 'string' && content.trim() === '/new';
   }
 
+  function isCompactCommand(content) {
+    return typeof content === 'string' && content.trim().startsWith('/compact');
+  }
+
   const bot = createDiscordBot({
     client,
     token,
@@ -706,6 +711,48 @@ export function createDiscordRuntime(options) {
           }
           return;
         }
+
+        if (payload.commandName === 'compact') {
+          if (!sessionManager || !payload.contextId) {
+            try {
+              await payload.interaction.reply('Session manager is not available.');
+            } catch (err) {
+              if (typeof onError === 'function') {
+                onError(err);
+              }
+            }
+            return;
+          }
+
+          try {
+            await payload.interaction.deferReply();
+            
+            const session = sessionManager.getOrCreate(payload.contextId);
+            const customInstructions = payload.interaction.options?.getString('instructions');
+            
+            // Get API key for the model
+            const apiKey = await authStorage.getApiKey(resolvedModel.provider);
+            
+            const result = await performCompaction(session, resolvedModel, apiKey, customInstructions);
+            
+            await payload.interaction.editReply(`Compacting session... Summarized messages into summary. Context now reduced.`);
+          } catch (err) {
+            if (typeof onError === 'function') {
+              onError(err);
+            }
+            try {
+              const errorMessage = `Failed to compact session: ${err.message}`;
+              if (payload.interaction.deferred) {
+                await payload.interaction.editReply(errorMessage);
+              } else {
+                await payload.interaction.reply(errorMessage);
+              }
+            } catch (replyErr) {
+              // Ignore secondary errors
+            }
+          }
+          return;
+        }
       })();
     },
     onMessage: (payload) => {
@@ -727,6 +774,62 @@ export function createDiscordRuntime(options) {
           } catch (err) {
             if (typeof onError === 'function') {
               onError(err);
+            }
+          }
+          return;
+        }
+
+        // Handle /compact command
+        if (isCompactCommand(payload.content)) {
+          if (!sessionManager || !payload.contextId) {
+            try {
+              await sendMessage({
+                content: 'Session manager is not available.',
+                channelId: payload.channelId,
+                threadId: payload.threadId,
+                contextId: payload.contextId,
+                messageId: payload.messageId,
+                authorId: payload.authorId,
+              });
+            } catch (err) {
+              if (typeof onError === 'function') {
+                onError(err);
+              }
+            }
+            return;
+          }
+
+          try {
+            const session = sessionManager.getOrCreate(payload.contextId);
+            const parts = payload.content.trim().split(/\s+/);
+            const customInstructions = parts.length > 1 ? parts.slice(1).join(' ') : undefined;
+
+            const apiKey = await authStorage.getApiKey(resolvedModel.provider);
+            await performCompaction(session, resolvedModel, apiKey, customInstructions);
+
+            await sendMessage({
+              content: 'Compacting session... Summarized messages into summary. Context now reduced.',
+              channelId: payload.channelId,
+              threadId: payload.threadId,
+              contextId: payload.contextId,
+              messageId: payload.messageId,
+              authorId: payload.authorId,
+            });
+          } catch (err) {
+            if (typeof onError === 'function') {
+              onError(err);
+            }
+            try {
+              await sendMessage({
+                content: `Failed to compact session: ${err.message}`,
+                channelId: payload.channelId,
+                threadId: payload.threadId,
+                contextId: payload.contextId,
+                messageId: payload.messageId,
+                authorId: payload.authorId,
+              });
+            } catch (sendErr) {
+              // Ignore secondary errors
             }
           }
           return;

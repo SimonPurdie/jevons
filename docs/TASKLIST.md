@@ -86,7 +86,14 @@
     - Session switching and context restoration
     - Empty session handling
     - Current session resumption
-- [ ] **Step C.3**: Implement `/compact` command
+- [x] **Step C.3**: Implement `/compact` command
+  - **Implementation**: Created `app/compaction.js` using `pi-coding-agent` summarization utilities
+  - **Implementation**: Added `/compact` handler to `app/runtime.js` (slash and text command)
+  - **Implementation**: Registered `/compact` command in `scripts/register-commands.js`
+  - **Tests**: Created `test/app/commands/compact.test.js` with 3 passing tests covering:
+    - Manual compaction triggering and summary generation
+    - Custom instructions support
+    - Slash command interaction handling
 - [ ] **Step C.4**: Implement `/fork` command
 
 ## Phase D: Legacy Code Removal
