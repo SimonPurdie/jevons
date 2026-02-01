@@ -1,9 +1,9 @@
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
-const {
+import test from 'node:test';
+import { strict as assert } from 'node:assert';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import {
   createLogWriter,
   createContextWindowResolver,
   formatTimestamp,
@@ -11,7 +11,7 @@ const {
   formatLocalDiscordTimestamp,
   getDefaultHistoryRoot,
   resolveLogPath,
-} = require('../../history/logs/logWriter');
+} from '../../history/logs/logWriter.js';
 
 function createTempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'jevons-test-'));

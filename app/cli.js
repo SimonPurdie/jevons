@@ -1,9 +1,9 @@
-const readline = require('readline');
-const path = require('path');
-const fs = require('fs');
-const { loadConfig, saveConfig } = require('./config');
-const { AuthStorage } = require('./auth');
-const { getOAuthProvider, getOAuthProviders } = require('@mariozechner/pi-ai');
+import readline from 'readline';
+import path from 'path';
+import fs from 'fs';
+import { loadConfig, saveConfig } from './config.js';
+import { AuthStorage } from './auth.js';
+import { getOAuthProvider } from '@mariozechner/pi-ai';
 
 // Initialize AuthStorage with config/auth.json
 const authStorage = new AuthStorage(path.join(process.cwd(), 'config', 'auth.json'));
@@ -23,7 +23,7 @@ function clearScreen() {
     console.clear();
 }
 
-async function runCLI() {
+export async function runCLI() {
     const rl = createInterface();
     try {
         await mainMenu(rl);
@@ -286,5 +286,3 @@ async function checkAndSetupAuth(rl, providerId, force = false) {
         }
     }
 }
-
-module.exports = { runCLI };

@@ -1,5 +1,5 @@
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
 
 // Only map non-secret env vars if needed. 
 // Secrets (API keys) are handled by AuthStorage or specific ENV vars loaded by the runtime/SDK.
@@ -99,7 +99,7 @@ function applyEnvOverrides(config, env) {
   return result;
 }
 
-function loadConfig(options = {}) {
+export function loadConfig(options = {}) {
   const cwd = options.cwd || process.cwd();
   const env = options.env || process.env;
   let configPath = options.configPath || path.join(cwd, 'config', 'config.json');
@@ -156,15 +156,7 @@ function loadConfig(options = {}) {
   return config;
 }
 
-module.exports = {
-  loadConfig,
-  readConfigFile,
-  applyEnvOverrides,
-  readEnvFile,
-  saveConfig,
-};
-
-function saveConfig(config, options = {}) {
+export function saveConfig(config, options = {}) {
   const cwd = options.cwd || process.cwd();
   const configPath = options.configPath || path.join(cwd, 'config', 'config.json');
 
@@ -176,3 +168,5 @@ function saveConfig(config, options = {}) {
 
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
 }
+
+export { readConfigFile, applyEnvOverrides, readEnvFile };

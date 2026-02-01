@@ -1,9 +1,9 @@
-const fs = require('fs');
-const path = require('path');
-const lockfile = require('proper-lockfile');
-const { getEnvApiKey, getOAuthApiKey, getOAuthProvider, getOAuthProviders } = require('@mariozechner/pi-ai');
+import fs from 'fs';
+import path from 'path';
+import lockfile from 'proper-lockfile';
+import { getEnvApiKey, getOAuthApiKey, getOAuthProvider } from '@mariozechner/pi-ai';
 
-class AuthStorage {
+export class AuthStorage {
     constructor(authPath) {
         this.authPath = authPath || path.join(process.cwd(), 'config', 'auth.json');
         this.data = {};
@@ -137,5 +137,3 @@ class AuthStorage {
         return false;
     }
 }
-
-module.exports = { AuthStorage };

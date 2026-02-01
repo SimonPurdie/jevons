@@ -1,10 +1,10 @@
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const { EventEmitter } = require('events');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
-const { createDiscordRuntime } = require('../../app/runtime');
+import test from 'node:test';
+import { strict as assert } from 'node:assert';
+import { EventEmitter } from 'events';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import { createDiscordRuntime } from '../../app/runtime.js';
 
 class MockDiscordClient extends EventEmitter {
   constructor() {
@@ -57,7 +57,7 @@ function makeMessage({
 }
 
 function flush() {
-  return new Promise((resolve) => setTimeout(resolve, 10));
+  return new Promise((resolve) => setTimeout(resolve, 50));
 }
 
 test('createDiscordRuntime sends model reply via sendMessage', async () => {

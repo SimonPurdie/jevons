@@ -1,13 +1,16 @@
-const { Client, GatewayIntentBits } = require('discord.js');
-const { loadConfig } = require('./config');
-const { sendDiscordMessage } = require('./discord');
-const { createDiscordRuntime } = require('./runtime');
-const { createSchedulerService } = require('../scheduler/service');
-const { createIpcServer } = require('./ipc');
-const logger = require('./logger');
-const { getDefaultHistoryRoot } = require('../history/logs/logWriter');
-const { AuthStorage } = require('./auth');
-const path = require('path');
+import { Client, GatewayIntentBits } from 'discord.js';
+import { loadConfig } from './config.js';
+import { sendDiscordMessage } from './discord.js';
+import { createDiscordRuntime } from './runtime.js';
+import { createSchedulerService } from '../scheduler/service.js';
+import { createIpcServer } from './ipc.js';
+import logger from './logger.js';
+import { getDefaultHistoryRoot } from '../history/logs/logWriter.js';
+import { AuthStorage } from './auth.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function createDiscordClient() {
   return new Client({
@@ -20,7 +23,7 @@ function createDiscordClient() {
 }
 
 
-async function startDiscordRuntime(deps = {}) {
+export async function startDiscordRuntime(deps = {}) {
   const _loadConfig = deps.loadConfig || loadConfig;
   const _createDiscordRuntime = deps.createDiscordRuntime || createDiscordRuntime;
   const _createSchedulerService = deps.createSchedulerService || createSchedulerService;
@@ -103,11 +106,7 @@ async function startDiscordRuntime(deps = {}) {
   };
 }
 
-module.exports = {
-  startDiscordRuntime,
-};
-
-if (require.main === module) {
+if (import.meta.url === `file://${process.argv[1]}`) {
   startDiscordRuntime().catch((err) => {
     logger.error('Failed to start Discord runtime', err);
     process.exitCode = 1;

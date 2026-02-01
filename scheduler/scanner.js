@@ -13,7 +13,7 @@ const TIME_ZONE = 'Europe/London';
  * @param {Date} [lastRunUtc] - The time of the last scan in UTC (optional)
  * @returns {boolean} True if the reminder should fire
  */
-function isReminderDue(reminder, nowUtc, lastRunUtc = null) {
+export function isReminderDue(reminder, nowUtc, lastRunUtc = null) {
   const { date, time, recur } = reminder;
   const londonParts = getLondonDateParts(nowUtc);
   
@@ -91,47 +91,21 @@ function isReminderDue(reminder, nowUtc, lastRunUtc = null) {
  * @returns {Date} The UTC Date
  */
 function localToUtc(dateStr, timeStr) {
-  // Construct a naive UTC date from the components
-  // Note: Date.parse might behave differently depending on environment, assume ISO format works as UTC
   const isoNaive = `${dateStr}T${timeStr}:00.000Z`;
   const candidate = new Date(isoNaive);
-  
-  // Offset probes
-  // BST is UTC+1. GMT is UTC+0.
-  // So Local Time T corresponds to UTC T-1h (if BST) or UTC T-0h (if GMT).
-  // We prefer BST (Earlier Occurrence in Overlap means smaller UTC timestamp? No.)
-  // Wait.
-  // Overlap: 01:30 happens at T1 (BST) and T2 (GMT).
-  // T1 (BST) -> Local 01:30. T1 = Local - 1h.
-  // T2 (GMT) -> Local 01:30. T2 = Local.
-  // T1 < T2.
-  // Spec: "Schedule at earlier occurrence". So we want T1.
-  // So we check BST first.
-  
   const oneHour = 60 * 60 * 1000;
   
-  // Probe 1: Assume BST (UTC = Local - 1h)
   const probeBst = new Date(candidate.getTime() - oneHour);
   if (isLondonTime(probeBst, dateStr, timeStr)) {
     return probeBst;
   }
   
-  // Probe 2: Assume GMT (UTC = Local)
   const probeGmt = candidate;
   if (isLondonTime(probeGmt, dateStr, timeStr)) {
     return probeGmt;
   }
   
-  // If neither, we are in a Gap.
-  // Map to the start of the next valid period.
-  // In Spring Forward (01:00 UTC -> 02:00 BST), the gap is 01:00 Local .. 01:59 Local.
-  // The transition happens at 01:00 UTC.
-  // probeBst (01:xx - 1h) -> 00:xx UTC. (Before transition)
-  // probeGmt (01:xx) -> 01:xx UTC. (After transition)
-  // We need to find the transition point between probeBst and probeGmt.
-  // The transition point is where the offset changes.
-  
-  return findGapTransition(probeBst, probeGmt);
+  return findGapTransitionRefined(probeBst, probeGmt, dateStr, timeStr);
 }
 
 /**
@@ -149,69 +123,6 @@ function isLondonTime(utcDate, expectedDate, expectedTime) {
 /**
  * Binary search to find the transition point in a gap
  */
-function findGapTransition(low, high) {
-  let lowTime = low.getTime();
-  let highTime = high.getTime();
-  
-  // We want the smallest T in [low, high] such that London(T) > Target?
-  // Actually, we want the T where the offset jump happens.
-  // London time jumps forward.
-  // At T_jump, London Time becomes T_jump + NewOffset.
-  // We just want to return T_jump.
-  // T_jump corresponds to the "Next Valid Local Minute".
-  
-  // Binary search for the point where local time "jumps" past the gap?
-  // No, we want the point where London(T) >= Target? No.
-  // We want T such that London(T) is the earliest valid time >= Target.
-  // Since Target is in the gap, the earliest valid time is the moment after the gap.
-  // This corresponds to T_jump (01:00 UTC in the example).
-  // London(T_jump) = 02:00. Target was 01:30.
-  // So yes, we want T_jump.
-  
-  // How to find T_jump?
-  // It's the point where offset changes?
-  // Or simply the point where London Time >= Expected Target?
-  // Wait, London Time > Expected Target is true for High (01:30 UTC -> 02:30 BST > 01:30).
-  // London Time < Expected Target is true for Low (00:30 UTC -> 00:30 GMT < 01:30).
-  // So we search for the boundary where it flips.
-  
-  // We compare formatted strings? lexicographically?
-  // Date+Time strings: "2026-03-29 02:30" > "2026-03-29 01:30".
-  // Yes.
-  
-  const targetStr = `${low.toISOString().split('T')[0]} ${high.toISOString().split('T')[0]}...`; // Hacky
-  // Better: compare epoch values of the "London Time".
-  // But we can't easily get London Epoch.
-  // Lexicographical comparison of YYYY-MM-DD HH:MM works.
-  
-  // Since we assume the gap is less than a day, and we passed in dateStr/timeStr implicitly via low/high context?
-  // Actually, localToUtc context has dateStr/timeStr.
-  // Let's pass the target string into this helper or use a comparator.
-  
-  // We iterate until 1 minute precision
-  while (highTime - lowTime > 60000) {
-    const midTime = Math.floor((lowTime + highTime) / 2);
-    const midDate = new Date(midTime);
-    const parts = getLondonDateParts(midDate);
-    const midLocalStr = `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`;
-    
-    // Construct target string from parts to ensure format matches
-    // But we don't have parts for target.
-    // We can infer target from `high`'s date components?
-    // Gap usually happens on the same day.
-    
-    // Comparison:
-    // If midLocalStr < targetLocalStr -> Low = Mid
-    // Else -> High = Mid
-    
-    // We need targetLocalStr available here.
-    // Let's refactor.
-  }
-  
-  return new Date(highTime);
-}
-
-// Helper to handle the gap search with closure
 function findGapTransitionRefined(low, high, targetDateStr, targetTimeStr) {
   let lowTime = low.getTime();
   let highTime = high.getTime();
@@ -233,26 +144,6 @@ function findGapTransitionRefined(low, high, targetDateStr, targetTimeStr) {
   // In a gap (Target doesn't exist), this will be the first valid time after gap.
   return new Date(highTime);
 }
-
-// Redefine localToUtc to use the refined helper
-function localToUtc(dateStr, timeStr) {
-  const isoNaive = `${dateStr}T${timeStr}:00.000Z`;
-  const candidate = new Date(isoNaive);
-  const oneHour = 60 * 60 * 1000;
-  
-  const probeBst = new Date(candidate.getTime() - oneHour);
-  if (isLondonTime(probeBst, dateStr, timeStr)) {
-    return probeBst;
-  }
-  
-  const probeGmt = candidate;
-  if (isLondonTime(probeGmt, dateStr, timeStr)) {
-    return probeGmt;
-  }
-  
-  return findGapTransitionRefined(probeBst, probeGmt, dateStr, timeStr);
-}
-
 
 /**
  * Get date parts in Europe/London
@@ -299,11 +190,6 @@ function getDaysInMonth(year, month) {
  * @param {Date} [lastRunUtc] - Time of last scan (optional)
  * @returns {Array} Array of due reminder objects
  */
-function scanDueReminders(reminders, nowUtc = new Date(), lastRunUtc = null) {
+export function scanDueReminders(reminders, nowUtc = new Date(), lastRunUtc = null) {
   return reminders.filter(reminder => isReminderDue(reminder, nowUtc, lastRunUtc));
 }
-
-module.exports = {
-  isReminderDue,
-  scanDueReminders
-};

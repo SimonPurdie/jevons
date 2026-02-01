@@ -4,7 +4,7 @@
  * Handles updates to the reminders file based on fired reminders.
  */
 
-const { parseReminderLine } = require('./parser');
+import { parseReminderLine } from './parser.js';
 
 /**
  * Update the reminders file content after reminders have fired.
@@ -14,7 +14,7 @@ const { parseReminderLine } = require('./parser');
  * @param {Array} firedReminders - Array of reminder objects that have fired (must have 'id' and 'recur')
  * @returns {string} The updated file content
  */
-function updateRemindersFile(content, firedReminders) {
+export function updateRemindersFile(content, firedReminders) {
   if (!content || typeof content !== 'string') {
     return '';
   }
@@ -54,7 +54,3 @@ function updateRemindersFile(content, firedReminders) {
 
   return keptLines.join('\n');
 }
-
-module.exports = {
-  updateRemindersFile
-};

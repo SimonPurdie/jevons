@@ -1,6 +1,6 @@
-const { AuthStorage } = require('../app/auth');
-const path = require('path');
-const readline = require('readline');
+import { AuthStorage } from '../app/auth.js';
+import path from 'path';
+import { getOAuthProviders } from '@mariozechner/pi-ai';
 
 async function login(providerId) {
     const authPath = path.join(process.cwd(), 'config', 'auth.json');
@@ -31,7 +31,7 @@ async function main() {
         console.log('Available providers: openai-codex, github-copilot, etc.');
         const authPath = path.join(process.cwd(), 'config', 'auth.json');
         const authStorage = new AuthStorage(authPath);
-        const providers = authStorage.getOAuthProviders();
+        const providers = getOAuthProviders();
         console.log('Supported OAuth providers:', providers.join(', '));
         process.exit(1);
     }

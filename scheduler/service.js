@@ -8,16 +8,16 @@
  * 4. Sends notifications
  * 5. Updates file (removes one-offs)
  */
-const fs = require('fs');
-const { 
+import fs from 'fs';
+import { 
   parseRemindersFile, 
   assignMissingIds, 
   formatReminderLine 
-} = require('./parser');
-const { scanDueReminders } = require('./scanner');
-const { updateRemindersFile } = require('./lifecycle');
+} from './parser.js';
+import { scanDueReminders } from './scanner.js';
+import { updateRemindersFile } from './lifecycle.js';
 
-function createSchedulerService(options) {
+export function createSchedulerService(options) {
   const {
     remindersFilePath,
     stateFilePath,
@@ -163,7 +163,3 @@ function createSchedulerService(options) {
     scan // exposed for testing
   };
 }
-
-module.exports = {
-  createSchedulerService
-};

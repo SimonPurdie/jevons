@@ -1,14 +1,14 @@
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
-const {
+import test from 'node:test';
+import { strict as assert } from 'node:assert';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import {
   ChatHistoryWindow,
   createChatHistoryWindow,
   readChatHistory,
   DEFAULT_CONFIG,
-} = require('../../history/chatHistory');
+} from '../../history/chatHistory.js';
 
 function createTempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'jevons-chat-history-test-'));

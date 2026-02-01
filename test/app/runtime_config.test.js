@@ -1,6 +1,6 @@
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const { createDiscordRuntime } = require('../../app/runtime');
+import test from 'node:test';
+import { strict as assert } from 'node:assert';
+import { createDiscordRuntime } from '../../app/runtime.js';
 
 class MockDiscordClient {
     constructor() {

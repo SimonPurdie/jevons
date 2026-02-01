@@ -1,10 +1,10 @@
-const fs = require('fs');
+import fs from 'fs';
 
 /**
  * Parse a log entry line in the new simplified format.
  * Format: "<role>: [Discord Guild #<guild> <surface> id:<id> +<offset>m <time> GMT] <author>:"
  */
-function parseLogLine(line) {
+export function parseLogLine(line) {
   if (!line || typeof line !== 'string') {
     return null;
   }
@@ -45,7 +45,7 @@ function parseLogLine(line) {
  * Read and parse all log entries from a file.
  * Returns array of entries with role, content, and metadata.
  */
-function readAllLogEntries(filePath) {
+export function readAllLogEntries(filePath) {
   if (!filePath || !fs.existsSync(filePath)) {
     return [];
   }
@@ -102,7 +102,7 @@ function readAllLogEntries(filePath) {
 /**
  * Read a specific log entry by line number.
  */
-function readLogEntry(filePath, lineNumber) {
+export function readLogEntry(filePath, lineNumber) {
   if (!filePath || typeof lineNumber !== 'number') {
     return null;
   }
@@ -113,9 +113,3 @@ function readLogEntry(filePath, lineNumber) {
   const entries = readAllLogEntries(filePath);
   return entries.find(e => e.line === lineNumber) || null;
 }
-
-module.exports = {
-  parseLogLine,
-  readLogEntry,
-  readAllLogEntries,
-};

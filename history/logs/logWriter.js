@@ -1,18 +1,18 @@
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 
 /**
  * Format a date for entry timestamp (ISO format)
  */
-function formatTimestamp(date = new Date()) {
+export function formatTimestamp(date = new Date()) {
   return date.toISOString();
 }
 
 /**
  * Format a date for filename using local time: YYYY-MM-DD-hhmm
  */
-function formatWindowTimestamp(date = new Date()) {
+export function formatWindowTimestamp(date = new Date()) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
@@ -24,7 +24,7 @@ function formatWindowTimestamp(date = new Date()) {
 /**
  * Get default history root directory: ~/jevons/memory/
  */
-function getDefaultHistoryRoot() {
+export function getDefaultHistoryRoot() {
   const homeDir = os.homedir();
   return path.join(homeDir, 'jevons', 'memory');
 }
@@ -32,7 +32,7 @@ function getDefaultHistoryRoot() {
 /**
  * Resolve log file path in flat structure: ~/jevons/memory/YYYY-MM-DD-hhmm.md
  */
-function resolveLogPath(historyRoot, windowTimestamp) {
+export function resolveLogPath(historyRoot, windowTimestamp) {
   const logPath = path.join(historyRoot, `${windowTimestamp}.md`);
   return {
     dir: historyRoot,
@@ -43,7 +43,7 @@ function resolveLogPath(historyRoot, windowTimestamp) {
 /**
  * Format a local timestamp for Discord context: YYYY-MM-DD hh:mm GMT
  */
-function formatLocalDiscordTimestamp(date = new Date()) {
+export function formatLocalDiscordTimestamp(date = new Date()) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
@@ -61,7 +61,7 @@ function getTimeOffset(windowStart, entryTime) {
   return diffMins > 0 ? `+${diffMins}m` : `${diffMins}m`;
 }
 
-function createLogWriter(options) {
+export function createLogWriter(options) {
   const {
     historyRoot,
     windowTimestamp,
@@ -147,7 +147,7 @@ function createLogWriter(options) {
   };
 }
 
-function createContextWindowResolver(options) {
+export function createContextWindowResolver(options) {
   const { historyRoot } = options || {};
   if (!historyRoot) {
     throw new Error('historyRoot is required');
@@ -194,13 +194,3 @@ function createContextWindowResolver(options) {
     _activeWindows: activeWindows,
   };
 }
-
-module.exports = {
-  createLogWriter,
-  createContextWindowResolver,
-  formatTimestamp,
-  formatWindowTimestamp,
-  formatLocalDiscordTimestamp,
-  getDefaultHistoryRoot,
-  resolveLogPath,
-};

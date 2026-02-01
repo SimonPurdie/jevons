@@ -1,7 +1,6 @@
-
-const assert = require('node:assert');
-const { test, describe } = require('node:test');
-const { isReminderDue, scanDueReminders } = require('../../scheduler/scanner');
+import assert from 'node:assert';
+import { test, describe } from 'node:test';
+import { isReminderDue, scanDueReminders } from '../../scheduler/scanner.js';
 
 describe('Scheduler Scanner', () => {
   // Helper to create a reminder object

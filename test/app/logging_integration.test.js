@@ -1,6 +1,6 @@
-const { describe, it, before, after, mock } = require('node:test');
-const assert = require('node:assert');
-const { startDiscordRuntime } = require('../../app/index.js');
+import { describe, it, before, after, mock } from 'node:test';
+import assert from 'node:assert';
+import { startDiscordRuntime } from '../../app/index.js';
 
 describe('Logging Integration', () => {
   let consoleLogMock;

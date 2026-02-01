@@ -1,10 +1,10 @@
-const { test, describe, afterEach } = require('node:test');
-const assert = require('node:assert');
-const fs = require('fs');
-const path = require('path');
-const { createSchedulerService } = require('../../scheduler/service');
+import { test, describe, afterEach } from 'node:test';
+import { strict as assert } from 'node:assert';
+import fs from 'fs';
+import path from 'path';
+import { createSchedulerService } from '../../scheduler/service.js';
 
-const TMP_DIR = path.join(__dirname, 'tmp');
+const TMP_DIR = path.join(import.meta.dirname, 'tmp');
 
 describe('Scheduler Service', () => {
   const remindersPath = path.join(TMP_DIR, 'reminders.md');

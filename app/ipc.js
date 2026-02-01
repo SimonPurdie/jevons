@@ -1,10 +1,10 @@
-const http = require('http');
+import http from 'http';
 
 /**
  * Creates a simple local IPC server to allow child processes (scripts)
  * to send messages via the running Discord bot.
  */
-function createIpcServer(options) {
+export function createIpcServer(options) {
   const { sendMessage, logger } = options;
   
   const server = http.createServer((req, res) => {
@@ -57,7 +57,3 @@ function createIpcServer(options) {
     })
   };
 }
-
-module.exports = {
-  createIpcServer
-};

@@ -1,7 +1,7 @@
 {
   "name": "jevons",
   "private": true,
-  "type": "commonjs",
+  "type": "module",
   "bin": "./bin/jevons",
   "scripts": {
     "start": "node app/index.js",

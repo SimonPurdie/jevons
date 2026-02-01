@@ -17,7 +17,7 @@ const TIME_PATTERN = /^(0\d|1\d|2[0-3]):[0-5]\d$/;
  * @param {string} line - The line to parse
  * @returns {object|null} Parsed reminder or null if invalid
  */
-function parseReminderLine(line) {
+export function parseReminderLine(line) {
   if (!line || typeof line !== 'string') {
     return null;
   }
@@ -183,7 +183,7 @@ function parseReminderLine(line) {
  * @param {string} content - The file content to parse
  * @returns {object[]} Array of parsed reminders (nulls filtered out)
  */
-function parseRemindersFile(content) {
+export function parseRemindersFile(content) {
   if (!content || typeof content !== 'string') {
     return [];
   }
@@ -214,7 +214,7 @@ function parseRemindersFile(content) {
  * Generate a reminder ID in rid_<base32> format
  * @returns {string} A new reminder ID
  */
-function generateReminderId() {
+export function generateReminderId() {
   const BASE32_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
   let id = 'rid_';
   for (let i = 0; i < 12; i++) {
@@ -228,7 +228,7 @@ function generateReminderId() {
  * @param {object} reminder - The reminder to format
  * @returns {string} The formatted line
  */
-function formatReminderLine(reminder) {
+export function formatReminderLine(reminder) {
   const { date, time, recur, msg, id } = reminder;
 
   // Escape quotes in message
@@ -253,7 +253,7 @@ function formatReminderLine(reminder) {
  *   - assigned: Array of {lineNumber, oldLine, newLine, id} for each ID assigned
  *   - unchanged: Count of lines that already had IDs or were invalid/empty/comments
  */
-function assignMissingIds(content) {
+export function assignMissingIds(content) {
   if (!content || typeof content !== 'string') {
     return {
       content: content || '',
@@ -322,14 +322,4 @@ function assignMissingIds(content) {
   };
 }
 
-module.exports = {
-  parseReminderLine,
-  parseRemindersFile,
-  generateReminderId,
-  formatReminderLine,
-  assignMissingIds,
-  VALID_RECURRENCE,
-  ID_PATTERN,
-  DATE_PATTERN,
-  TIME_PATTERN,
-};
+export { VALID_RECURRENCE, ID_PATTERN, DATE_PATTERN, TIME_PATTERN };

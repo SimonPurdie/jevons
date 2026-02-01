@@ -1,7 +1,7 @@
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const { EventEmitter } = require('events');
-const { createDiscordBot, extractContext, splitMessage, sendDiscordMessage } = require('../../app/discord');
+import test from 'node:test';
+import { strict as assert } from 'node:assert';
+import { EventEmitter } from 'events';
+import { createDiscordBot, extractContext, splitMessage, sendDiscordMessage } from '../../app/discord.js';
 
 class MockDiscordClient extends EventEmitter {
   constructor() {

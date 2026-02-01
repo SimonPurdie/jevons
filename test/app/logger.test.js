@@ -1,6 +1,6 @@
-const { describe, it } = require('node:test');
-const assert = require('node:assert');
-const logger = require('../../app/logger');
+import { describe, it } from 'node:test';
+import assert from 'node:assert';
+import logger from '../../app/logger.js';
 
 describe('Logger', () => {
   it('should format logs correctly', () => {

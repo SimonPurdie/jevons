@@ -60,7 +60,7 @@ function log(level, message, context) {
   }
 }
 
-module.exports = {
+export default {
   LEVELS,
   debug: (msg, ctx) => log(LEVELS.DEBUG, msg, ctx),
   info: (msg, ctx) => log(LEVELS.INFO, msg, ctx),
@@ -70,3 +70,5 @@ module.exports = {
   formatLog,
   shouldLog,
 };
+
+export { LEVELS, formatLog, shouldLog };

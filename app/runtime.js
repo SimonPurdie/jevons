@@ -1,13 +1,20 @@
-const { createDiscordBot } = require('./discord');
-const { createContextWindowResolver } = require('../history/logs/logWriter');
-const { readLogEntry } = require('../history/logs/logReader');
-const { readChatHistory } = require('../history/chatHistory');
-const { loadSkill } = require('../skills/loader');
-const { createBashTool } = require('./tools/bash');
+import { createDiscordBot, sendDiscordMessage } from './discord.js';
+import { createContextWindowResolver } from '../history/logs/logWriter.js';
+import { readLogEntry } from '../history/logs/logReader.js';
+import { readChatHistory } from '../history/chatHistory.js';
+import { loadSkill } from '../skills/loader.js';
+import { createBashTool } from './tools/bash.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-function resolvePiAi() {
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+async function resolvePiAi() {
   try {
-    return require('@mariozechner/pi-ai');
+    // Dynamic import for ESM module
+    const module = await import('@mariozechner/pi-ai');
+    return module;
   } catch (err) {
     throw new Error('pi-ai is not installed; run npm install');
   }
@@ -156,9 +163,6 @@ function normalizePiAiMessages(messages, modelInstance) {
     return msg;
   });
 }
-
-const fs = require('fs');
-const path = require('path');
 
 function logContextToFile(context) {
   const logsDir = path.join(process.cwd(), 'logs');
@@ -339,7 +343,7 @@ function normalizeHistoryMessages(history, modelInstance) {
   });
 }
 
-async function generateReply(payload, modelInstance, options = {}) {
+export async function generateReply(payload, modelInstance, options = {}) {
   if (!payload || typeof payload.content !== 'string') {
     return null;
   }
@@ -406,7 +410,7 @@ async function generateReply(payload, modelInstance, options = {}) {
   return reply;
 }
 
-function createDiscordRuntime(options) {
+export function createDiscordRuntime(options) {
   const {
     client,
     token,
@@ -628,6 +632,7 @@ function createDiscordRuntime(options) {
         const runtimeTools = [createBashTool(process.cwd(), extraEnv)];
 
         let stopTyping = () => { };
+        let reply;
         try {
           stopTyping = startTypingLoop(payload.contextId);
           reply = await generateReply(payload, resolvedModel, {
@@ -703,9 +708,4 @@ function createDiscordRuntime(options) {
   };
 }
 
-module.exports = {
-  createDiscordRuntime,
-  extractReplyContent,
-  generateReply,
-  formatModelError,
-};
+export { extractReplyContent, formatModelError };

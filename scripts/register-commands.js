@@ -1,6 +1,6 @@
-const { REST, Routes, SlashCommandBuilder } = require('discord.js');
-const { loadConfig } = require('../app/config');
-const path = require('path');
+import { REST, Routes, SlashCommandBuilder } from 'discord.js';
+import { loadConfig } from '../app/config.js';
+import path from 'path';
 
 async function registerCommands() {
     const config = loadConfig();

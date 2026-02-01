@@ -1,6 +1,6 @@
-const fs = require('fs');
-const path = require('path');
-const { spawn } = require('child_process');
+import fs from 'fs';
+import path from 'path';
+import { spawn } from 'child_process';
 
 /**
  * Load skills from the skills directory.
@@ -9,7 +9,7 @@ const { spawn } = require('child_process');
  * @param {string} options.skillName - Name of skill to load (optional, loads all if not specified)
  * @returns {Object|Array<Object>} Skill(s) with metadata and content
  */
-function loadSkill(options = {}) {
+export function loadSkill(options = {}) {
   const { skillsDir = './skills', skillName } = options;
 
   if (!fs.existsSync(skillsDir)) {
@@ -82,7 +82,7 @@ function loadSkillFromPath(skillPath, name) {
  * @param {number} options.timeout - Timeout in ms (default: 30000)
  * @returns {Promise<Object>} Execution result with stdout, stderr, exitCode
  */
-function executeSkillScript(options = {}) {
+export function executeSkillScript(options = {}) {
   const { scriptPath, args = [], env = {}, timeout = 30000 } = options;
 
   if (!scriptPath) {
@@ -152,7 +152,7 @@ function executeSkillScript(options = {}) {
  * @param {Object} skill - Skill object from loadSkill
  * @returns {string[]} Array of available script names
  */
-function getAvailableScripts(skill) {
+export function getAvailableScripts(skill) {
   if (!skill || !skill.scripts) {
     return [];
   }
@@ -169,7 +169,7 @@ function getAvailableScripts(skill) {
  * @param {number} options.timeout - Timeout in ms (optional)
  * @returns {Promise<Object>} Execution result
  */
-async function executeSkill(options = {}) {
+export async function executeSkill(options = {}) {
   const { skill, scriptName, args = [], env = {}, timeout = 30000 } = options;
 
   if (!skill) {
@@ -187,10 +187,3 @@ async function executeSkill(options = {}) {
 
   return executeSkillScript({ scriptPath, args, env, timeout });
 }
-
-module.exports = {
-  loadSkill,
-  executeSkillScript,
-  executeSkill,
-  getAvailableScripts,
-};

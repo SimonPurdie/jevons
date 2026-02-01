@@ -1,6 +1,6 @@
-const { test } = require('node:test');
-const assert = require('node:assert');
-const { updateRemindersFile } = require('../../scheduler/lifecycle');
+import test from 'node:test';
+import assert from 'node:assert';
+import { updateRemindersFile } from '../../scheduler/lifecycle.js';
 
 test('lifecycle: updates reminders file correctly', async (t) => {
   await t.test('removes fired one-off reminders', () => {

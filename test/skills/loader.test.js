@@ -1,9 +1,9 @@
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
-const { loadSkill, executeSkillScript, executeSkill, getAvailableScripts } = require('../../skills/loader');
+import test from 'node:test';
+import { strict as assert } from 'node:assert';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import { loadSkill, executeSkillScript, executeSkill, getAvailableScripts } from '../../skills/loader.js';
 
 function makeTempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'jevons-skills-'));

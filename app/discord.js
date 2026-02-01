@@ -1,4 +1,4 @@
-const { EventEmitter } = require('events');
+import { EventEmitter } from 'events';
 
 function isThreadChannel(channel) {
   return Boolean(channel && channel.isThread);
@@ -35,7 +35,7 @@ function extractContext(messageOrInteraction, rootChannelId) {
   return null;
 }
 
-function createDiscordBot(options) {
+export function createDiscordBot(options) {
   const {
     client,
     token,
@@ -129,7 +129,7 @@ function createDiscordBot(options) {
   };
 }
 
-function sendDiscordMessage(client, payload) {
+export function sendDiscordMessage(client, payload) {
   const { content, channelId, threadId } = payload;
   let targetId = (threadId && threadId !== 'null') ? threadId : channelId;
 
@@ -182,9 +182,4 @@ function splitMessage(text, maxLength = 2000) {
   return chunks;
 }
 
-module.exports = {
-  createDiscordBot,
-  extractContext,
-  sendDiscordMessage,
-  splitMessage,
-};
+export { extractContext, splitMessage };

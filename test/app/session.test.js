@@ -1,15 +1,15 @@
-const { describe, it } = require('node:test');
-const assert = require('node:assert');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+import { describe, it } from 'node:test';
+import assert from 'node:assert';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 
-const {
+import {
   getDefaultSessionDir,
   getSessionDir,
   ensureSessionDirExists,
   validateSessionDir,
-} = require('../../app/session');
+} from '../../app/session.js';
 
 describe('session', () => {
   describe('getDefaultSessionDir()', () => {

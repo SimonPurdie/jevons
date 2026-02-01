@@ -1,5 +1,5 @@
-const { spawn } = require('node:child_process');
-const { Type } = require('@sinclair/typebox');
+import { spawn } from 'node:child_process';
+import { Type } from '@sinclair/typebox';
 
 const MAX_OUTPUT_BYTES = 64 * 1024;
 const MAX_OUTPUT_LINES = 2000;
@@ -33,7 +33,7 @@ function truncateOutput(output) {
   return { text: text || '(no output)', truncated };
 }
 
-function createBashTool(cwd, extraEnv = {}) {
+export function createBashTool(cwd, extraEnv = {}) {
   return {
     name: 'bash',
     label: 'bash',
@@ -147,7 +147,3 @@ function createBashTool(cwd, extraEnv = {}) {
     },
   };
 }
-
-module.exports = {
-  createBashTool,
-};

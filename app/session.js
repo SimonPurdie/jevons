@@ -1,14 +1,14 @@
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 
 const PI_SESSION_DIR = path.join(os.homedir(), '.pi', 'agent', 'sessions');
 
-function getDefaultSessionDir() {
+export function getDefaultSessionDir() {
   return path.join(PI_SESSION_DIR, '--jevons--');
 }
 
-function getSessionDir(config) {
+export function getSessionDir(config) {
   const configuredDir = config && config.sessionDir;
   
   if (configuredDir) {
@@ -19,14 +19,14 @@ function getSessionDir(config) {
   return getDefaultSessionDir();
 }
 
-function ensureSessionDirExists(sessionDir) {
+export function ensureSessionDirExists(sessionDir) {
   if (!fs.existsSync(sessionDir)) {
     fs.mkdirSync(sessionDir, { recursive: true });
   }
   return sessionDir;
 }
 
-function validateSessionDir(sessionDir) {
+export function validateSessionDir(sessionDir) {
   if (!sessionDir) {
     throw new Error('Session directory is required');
   }
@@ -37,10 +37,3 @@ function validateSessionDir(sessionDir) {
   
   return true;
 }
-
-module.exports = {
-  getDefaultSessionDir,
-  getSessionDir,
-  ensureSessionDirExists,
-  validateSessionDir,
-};

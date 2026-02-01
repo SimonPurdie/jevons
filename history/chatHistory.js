@@ -5,7 +5,7 @@
  * Follows SPEC.md for prompt-side chat history injection.
  */
 
-const { readAllLogEntries } = require('./logs/logReader');
+import { readAllLogEntries } from './logs/logReader.js';
 
 const DEFAULT_CONFIG = {
   maxHistoryMessages: 20,
@@ -142,21 +142,16 @@ class ChatHistoryWindow {
 /**
  * Factory function to create a chat history window manager.
  */
-function createChatHistoryWindow(options = {}) {
+export function createChatHistoryWindow(options = {}) {
   return new ChatHistoryWindow(options);
 }
 
 /**
  * Read chat history from a log file with default settings.
  */
-function readChatHistory(logPath, options = {}) {
+export function readChatHistory(logPath, options = {}) {
   const window = createChatHistoryWindow(options);
   return window.readHistoryFromLog(logPath);
 }
 
-module.exports = {
-  ChatHistoryWindow,
-  createChatHistoryWindow,
-  readChatHistory,
-  DEFAULT_CONFIG,
-};
+export { ChatHistoryWindow, DEFAULT_CONFIG };

@@ -8,18 +8,29 @@ The `@mariozechner/pi-coding-agent` package (added in Step A.1) is ESM-only (has
 Error [ERR_PACKAGE_PATH_NOT_EXPORTED]: No "exports" main defined in .../pi-coding-agent/package.json
 ```
 
-**Resolution**: Use dynamic `import()` statements in CommonJS code to load ESM modules.
+**Resolution**: Migrated entire codebase to ESM in Step A.1.1
 
-Example:
+**Migration Summary**:
+- Changed `package.json` `"type"` from `"commonjs"` to `"module"`
+- Converted all `require()` statements to `import`
+- Converted all `module.exports` to `export` or `export default`
+- Replaced `__dirname` with `import.meta.dirname` (or `fileURLToPath(import.meta.url)` pattern)
+- Replaced `require.main === module` with `import.meta.url === 'file://' + process.argv[1]`
+
+**Example conversions**:
 ```javascript
-// Instead of: const { SessionManager } = require('@mariozechner/pi-coding-agent');
-// Use: 
-const { SessionManager } = await import('@mariozechner/pi-coding-agent');
+// Before (CommonJS):
+const fs = require('fs');
+const { helper } = require('./utils');
+module.exports = { func };
+
+// After (ESM):
+import fs from 'fs';
+import { helper } from './utils.js';  // Note: .js extension required
+export { func };
 ```
 
-Note: This requires the importing code to be async (either in an async function or using top-level await if supported by the Node.js version).
-
-**Impact on migration**:
-- All imports from `pi-coding-agent` must use dynamic imports
-- Test files need to be restructured to support async module loading
-- The integration test for Step A.1 should verify dynamic import works correctly
+**Important notes**:
+- ESM requires explicit file extensions in imports (e.g., `./config.js` not `./config`)
+- Dynamic imports return a module namespace object; use `const module = await import('pkg'); const { name } = module;`
+- 150/154 tests passing after migration (4 pre-existing async timing issues unrelated to ESM)
