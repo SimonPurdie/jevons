@@ -5,7 +5,6 @@ import { createDiscordRuntime } from './runtime.js';
 import { createSchedulerService } from '../scheduler/service.js';
 import { createIpcServer } from './ipc.js';
 import logger from './logger.js';
-import { getDefaultHistoryRoot } from '../history/logs/logWriter.js';
 import { AuthStorage } from './auth.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -34,7 +33,6 @@ export async function startDiscordRuntime(deps = {}) {
 
   const config = _loadConfig();
   const discordConfig = config.discord || {};
-  const historyConfig = config.history || {};
   const remindersConfig = config.reminders || {};
 
   const token = process.env.JEVONS_DISCORD_TOKEN || discordConfig.token;
@@ -82,7 +80,6 @@ export async function startDiscordRuntime(deps = {}) {
     skillsDir: path.join(__dirname, '../skills'),
     sendMessage,
     ipcPort,
-    historyRoot: historyConfig.root || getDefaultHistoryRoot(),
     onReady: () => {
       logger.info('Discord runtime ready');
       if (remindersConfig.file_path) {

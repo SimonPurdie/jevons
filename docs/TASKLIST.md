@@ -106,7 +106,10 @@
   - **Note**: Forked sessions properly inherit history only up to the fork point as verified by tests
 
 ## Phase D: Legacy Code Removal
-- [ ] **Step D.1**: Remove custom history system
+- [x] **Step D.1**: Remove custom history system
+  - **Implementation**: Deleted `history/` and `test/history/` directories
+  - **Implementation**: Removed `history/` imports and `historyRoot` usage in `app/index.js`
+  - **Tests**: All 212 tests passed after removal
 
 ## Phase E: Migration of Existing Data
 - [ ] **Step E.1**: Create migration script
