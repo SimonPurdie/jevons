@@ -10,6 +10,7 @@
   "dependencies": {
     "@mariozechner/pi-agent-core": "^0.50.6",
     "@mariozechner/pi-ai": "^0.50.5",
+    "@mariozechner/pi-coding-agent": "^0.50.9",
     "@sinclair/typebox": "^0.34.48",
     "discord.js": "^14.0.0",
     "proper-lockfile": "^4.1.2"

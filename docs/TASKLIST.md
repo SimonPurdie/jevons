@@ -25,7 +25,8 @@
 ---
 
 ## Phase A: Foundation Setup
-- [ ] **Step A.1**: Add `pi-coding-agent` dependency
+- [x] **Step A.1**: Add `pi-coding-agent` dependency
+  - **Note**: The package is ESM-only. Use dynamic `import()` for all imports. See BREADCRUMBS.md for details.
 - [ ] **Step A.2**: Create session directory configuration
 - [ ] **Step A.3**: Switch to `pi-coding-agent`'s `AuthStorage`
 
