@@ -22,15 +22,15 @@ function formatWindowTimestamp(date = new Date()) {
 }
 
 /**
- * Get default history root directory: ~/jevons/history/
+ * Get default history root directory: ~/jevons/memory/
  */
 function getDefaultHistoryRoot() {
   const homeDir = os.homedir();
-  return path.join(homeDir, 'jevons', 'history');
+  return path.join(homeDir, 'jevons', 'memory');
 }
 
 /**
- * Resolve log file path in flat structure: ~/jevons/history/YYYY-MM-DD-hhmm.md
+ * Resolve log file path in flat structure: ~/jevons/memory/YYYY-MM-DD-hhmm.md
  */
 function resolveLogPath(historyRoot, windowTimestamp) {
   const logPath = path.join(historyRoot, `${windowTimestamp}.md`);
@@ -107,7 +107,7 @@ function createLogWriter(options) {
     const entryTime = entry.timestamp ? new Date(entry.timestamp) : new Date();
     const role = entry.role === 'user' ? 'user' : 'assistant';
     const content = (entry.content || '');
-    
+
     // Format Discord context line similar to clawd examples
     // [Discord Guild #<guild> channel id:<channel-id> +<offset>m <local-time> GMT] <author>:
     const offset = getTimeOffset(windowStartDate, entryTime);
@@ -115,26 +115,26 @@ function createLogWriter(options) {
     const authorName = entry.authorName || (role === 'user' ? 'user' : 'assistant');
     const guildName = context.guildName || 'Unknown';
     const contextId = context.contextId || 'unknown';
-    
+
     let line = `${role}: [Discord Guild #${guildName} ${context.surface} id:${contextId} ${offset} ${localTime} GMT] ${authorName}:\n`;
-    
+
     // Add content with proper indentation for multi-line
     const contentLines = content.split('\n');
     for (const contentLine of contentLines) {
       line += `${contentLine}\n`;
     }
-    
+
     // Add message_id if available (minimal metadata)
     if (entry.messageId) {
       line += `[message_id: ${entry.messageId}]\n`;
     }
-    
+
     fs.appendFileSync(logPath, line, 'utf8');
-    
+
     // Count lines for return value
     const fileContent = fs.readFileSync(logPath, 'utf8');
     const lineCount = fileContent.split('\n').length;
-    
+
     return {
       path: logPath,
       line: lineCount,
