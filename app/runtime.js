@@ -28,88 +28,6 @@ async function resolvePiAgentCore() {
   }
 }
 
-function extractReplyContent(response) {
-  const extractFromBlocks = (blocks) => {
-    if (!Array.isArray(blocks)) {
-      return null;
-    }
-    for (const block of blocks) {
-      if (!block) {
-        continue;
-      }
-      if (typeof block === 'string') {
-        return block;
-      }
-      if (typeof block.text === 'string') {
-        return block.text;
-      }
-      if (typeof block.content === 'string') {
-        return block.content;
-      }
-      if (typeof block.thinking === 'string') {
-        return block.thinking;
-      }
-      if (block.type === 'text' && typeof block.text === 'string') {
-        return block.text;
-      }
-    }
-    return null;
-  };
-
-  if (!response) {
-    return null;
-  }
-  if (typeof response === 'string') {
-    return response;
-  }
-  if (typeof response.output_text === 'string') {
-    return response.output_text;
-  }
-  if (response.output && typeof response.output.text === 'string') {
-    return response.output.text;
-  }
-  if (typeof response.text === 'string') {
-    return response.text;
-  }
-  if (response.message) {
-    if (typeof response.message.content === 'string') {
-      return response.message.content;
-    }
-    const messageBlockText = extractFromBlocks(response.message.content);
-    if (messageBlockText) {
-      return messageBlockText;
-    }
-  }
-  const contentBlockText = extractFromBlocks(response.content);
-  if (contentBlockText) {
-    return contentBlockText;
-  }
-  if (Array.isArray(response.choices)) {
-    for (const choice of response.choices) {
-      if (choice && choice.message && typeof choice.message.content === 'string') {
-        return choice.message.content;
-      }
-      const choiceMessageBlocks = extractFromBlocks(choice && choice.message && choice.message.content);
-      if (choiceMessageBlocks) {
-        return choiceMessageBlocks;
-      }
-      if (choice && typeof choice.text === 'string') {
-        return choice.text;
-      }
-    }
-  }
-  if (typeof response.errorMessage === 'string') {
-    return response.errorMessage;
-  }
-  return null;
-}
-
-function formatModelError(err) {
-  if (err && typeof err.message === 'string' && err.message.trim()) {
-    return `API error: ${err.message}`;
-  }
-  return 'API error: request failed';
-}
 
 function normalizePiAiMessages(messages, modelInstance) {
   if (!Array.isArray(messages)) {
@@ -216,48 +134,22 @@ function logAgentInteraction(agent, userContent, timestamp) {
   }
 }
 
-function extractTextFromBlocks(blocks) {
+/**
+ * Extracts text from an array of message blocks.
+ */
+function getTextFromBlocks(blocks) {
   if (!Array.isArray(blocks)) {
-    return null;
+    return typeof blocks === 'string' ? blocks : null;
   }
-  for (const block of blocks) {
-    if (!block) {
-      continue;
-    }
-    if (typeof block === 'string') {
-      return block;
-    }
-    if (typeof block.text === 'string') {
-      return block.text;
-    }
-    if (typeof block.content === 'string') {
-      return block.content;
-    }
-    if (block.type === 'text' && typeof block.text === 'string') {
-      return block.text;
-    }
-  }
-  return null;
-}
-
-function extractLatestAssistantText(messages) {
-  if (!Array.isArray(messages)) {
-    return null;
-  }
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const message = messages[i];
-    if (!message || message.role !== 'assistant') {
-      continue;
-    }
-    if (typeof message.content === 'string') {
-      return message.content;
-    }
-    const text = extractTextFromBlocks(message.content);
-    if (text && text.trim()) {
-      return text;
-    }
-  }
-  return null;
+  return blocks
+    .map(block => {
+      if (!block) return '';
+      if (typeof block === 'string') return block;
+      if (block.type === 'text') return block.text || '';
+      return '';
+    })
+    .join('')
+    .trim();
 }
 
 /**
@@ -444,7 +336,20 @@ export async function generateReply(payload, modelInstance, options = {}) {
 
   logAgentInteraction(agent, content, Date.now());
 
-  const reply = extractLatestAssistantText(agent.state.messages);
+  // Get the absolute latest message from the agent's state
+  const latestMessage = agent.state.messages[agent.state.messages.length - 1];
+
+  if (!latestMessage || latestMessage.role !== 'assistant') {
+    return '...';
+  }
+
+  // Handle API Errors directly from the message record
+  if (latestMessage.stopReason === 'error' || latestMessage.errorMessage) {
+    const errorMsg = latestMessage.errorMessage || 'API error: request failed';
+    return `API error: ${errorMsg}`;
+  }
+
+  const reply = getTextFromBlocks(latestMessage.content);
 
   // Persist assistant response to session
   if (options.sessionManager && payload.contextId && reply && reply.trim()) {
@@ -457,13 +362,10 @@ export async function generateReply(payload, modelInstance, options = {}) {
   }
 
   if (!reply || !reply.trim()) {
-    const hasToolCalls = agent.state.messages.some(m => m.role === 'assistant' && Array.isArray(m.content) && m.content.some(c => c.type === 'tool_call'));
+    const hasToolCalls = Array.isArray(latestMessage.content) && latestMessage.content.some(c => c.type === 'tool_call');
     if (hasToolCalls) {
-      // If the model made tool calls but didn't provide a final summary, 
-      // return a default acknowledgement.
       return 'Action completed.';
     }
-    // Return lowkey indicator instead of throwing an error
     return '...';
   }
   return reply;
@@ -636,9 +538,12 @@ export async function createDiscordRuntime(options) {
               const timeAgo = formatTimeAgo(timestamp);
               // Extract text without time injection prefix for cleaner preview
               let preview = session.firstMessage || 'No preview available';
+              if (Array.isArray(preview)) {
+                preview = getTextFromBlocks(preview) || 'No preview available';
+              }
               // Remove time injection prefix if present (format: <Current Time: ...>\n)
               preview = preview.replace(/<Current Time:.*?>[\r\n]*/, '').trim();
-              // Discord select menu label limit: 100 chars, description limit: 100 chars
+
               const truncatedPreview = preview.length > 60 ? preview.slice(0, 60) + '...' : preview;
               const label = `Session ${index + 1}: ${truncatedPreview}`.slice(0, 100);
               const description = `${timeAgo} - ${session.messageCount || 0} messages`.slice(0, 100);
@@ -1068,10 +973,9 @@ export async function createDiscordRuntime(options) {
         const runtimeTools = [createBashTool(process.cwd(), extraEnv)];
 
         let stopTyping = () => { };
-        let reply;
         try {
           stopTyping = startTypingLoop(payload.contextId);
-          reply = await generateReply(payload, resolvedModel, {
+          const reply = await generateReply(payload, resolvedModel, {
             sessionManager,
             skills: loadedSkills,
             tools: runtimeTools,
@@ -1079,58 +983,23 @@ export async function createDiscordRuntime(options) {
             resolvePiAgentCore: _resolvePiAgentCore,
             authStorage,
           });
-        } catch (err) {
-          const errorMessage = formatModelError(err);
-          // Persist error message to session if available
-          if (sessionManager && payload.contextId) {
-            const session = sessionManager.getOrCreate(payload.contextId);
-            session.sessionManager.appendMessage({
-              role: 'assistant',
-              content: errorMessage,
-              timestamp: Date.now(),
-            });
-          }
-          try {
+
+          if (reply) {
             await sendMessage({
-              content: errorMessage,
+              content: reply,
               channelId: payload.channelId,
               threadId: payload.threadId,
               contextId: payload.contextId,
               messageId: payload.messageId,
               authorId: payload.authorId,
             });
-          } catch (sendErr) {
-            if (typeof onError === 'function') {
-              onError(sendErr);
-            }
           }
-          if (typeof onError === 'function') {
-            onError(err);
-          }
-          return;
-        } finally {
-          stopTyping();
-        }
-
-        if (!reply) {
-          return;
-        }
-
-        try {
-          await sendMessage({
-            content: reply,
-            channelId: payload.channelId,
-            threadId: payload.threadId,
-            contextId: payload.contextId,
-            messageId: payload.messageId,
-            authorId: payload.authorId,
-          });
         } catch (err) {
           if (typeof onError === 'function') {
             onError(err);
-            return;
           }
-          throw err;
+        } finally {
+          stopTyping();
         }
       })();
     },
@@ -1142,4 +1011,4 @@ export async function createDiscordRuntime(options) {
   };
 }
 
-export { extractReplyContent, formatModelError };
+export { getTextFromBlocks };
