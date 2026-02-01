@@ -34,3 +34,7 @@ export { func };
 - ESM requires explicit file extensions in imports (e.g., `./config.js` not `./config`)
 - Dynamic imports return a module namespace object; use `const module = await import('pkg'); const { name } = module;`
 - 150/154 tests passing after migration (4 pre-existing async timing issues unrelated to ESM)
+
+**Discord Select Menu Limits**
+- Discord select menu `value` fields have a maximum length of 100 characters. When using absolute file paths as values (e.g., for `/resume`), ensure you use only the filename (`path.basename()`) and reconstruct the path on the backend if necessary.
+- Discord select menu `label` and `description` fields also have a 100-character limit. Previews and titles must be truncated.

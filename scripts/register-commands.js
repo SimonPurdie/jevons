@@ -16,6 +16,9 @@ async function registerCommands() {
         new SlashCommandBuilder()
             .setName('new')
             .setDescription('Start a fresh conversation (old session is preserved)'),
+        new SlashCommandBuilder()
+            .setName('resume')
+            .setDescription('Resume a previous conversation session'),
     ].map(command => command.toJSON());
 
     const rest = new REST({ version: '10' }).setToken(discordConfig.token);

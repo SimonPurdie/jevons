@@ -146,10 +146,14 @@ export class DiscordSessionManager {
         }
 
         const contextSessionDir = this._getContextSessionDir(contextId);
+        const fullPath = path.isAbsolute(sessionFilePath)
+            ? sessionFilePath
+            : path.join(contextSessionDir, sessionFilePath);
+            
         let sessionManager;
         
         try {
-            sessionManager = PiSessionManager.open(sessionFilePath, contextSessionDir);
+            sessionManager = PiSessionManager.open(fullPath, contextSessionDir);
         } catch (err) {
             logger.error(`Failed to open session file for context ${contextId}`, {
                 contextId,

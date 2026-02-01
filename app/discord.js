@@ -77,21 +77,33 @@ export function createDiscordBot(options) {
   });
 
   client.on('interactionCreate', async (interaction) => {
-    if (!interaction.isChatInputCommand()) return;
-
     const context = extractContext(interaction, channelId);
     if (!context) {
       return;
     }
 
-    if (typeof onInteraction === 'function') {
-      onInteraction({
-        commandName: interaction.commandName,
-        options: interaction.options,
-        authorId: interaction.user ? interaction.user.id : null,
-        interaction,
-        ...context,
-      });
+    if (interaction.isChatInputCommand()) {
+      if (typeof onInteraction === 'function') {
+        onInteraction({
+          commandName: interaction.commandName,
+          options: interaction.options,
+          authorId: interaction.user ? interaction.user.id : null,
+          interaction,
+          ...context,
+        });
+      }
+    } else if (interaction.isStringSelectMenu()) {
+      // Handle select menu interactions
+      if (typeof onInteraction === 'function') {
+        onInteraction({
+          customId: interaction.customId,
+          values: interaction.values,
+          authorId: interaction.user ? interaction.user.id : null,
+          interaction,
+          isSelectMenu: true,
+          ...context,
+        });
+      }
     }
   });
 

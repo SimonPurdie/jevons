@@ -1,4 +1,5 @@
 import { createDiscordBot, sendDiscordMessage } from './discord.js';
+import { StringSelectMenuBuilder, ActionRowBuilder } from 'discord.js';
 import { DiscordSessionManager } from './sessionManager.js';
 import { loadSkill } from '../skills/loader.js';
 import { createBashTool } from './tools/bash.js';
@@ -321,6 +322,37 @@ function formatCurrentTime(date = new Date()) {
   return `<Current Time: ${yyyy}-${mm}-${dd} ${hh}:${min}:${ss} ${weekday} ${timeOfDay}>`;
 }
 
+/**
+ * Formats a date as a relative time string (e.g., "2 hours ago", "yesterday").
+ * @param {Date} date - The date to format
+ * @returns {string} Relative time description
+ */
+function formatTimeAgo(date) {
+  const now = new Date();
+  const diffMs = now - date;
+  const diffSecs = Math.floor(diffMs / 1000);
+  const diffMins = Math.floor(diffSecs / 60);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffSecs < 60) {
+    return 'just now';
+  } else if (diffMins < 60) {
+    return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`;
+  } else if (diffHours < 24) {
+    return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
+  } else if (diffDays === 1) {
+    return 'yesterday';
+  } else if (diffDays < 7) {
+    return `${diffDays} days ago`;
+  } else if (diffDays < 30) {
+    const weeks = Math.floor(diffDays / 7);
+    return `${weeks} week${weeks !== 1 ? 's' : ''} ago`;
+  } else {
+    return date.toLocaleDateString();
+  }
+}
+
 function normalizeHistoryMessages(history, modelInstance) {
   if (!Array.isArray(history)) {
     return [];
@@ -564,6 +596,112 @@ export function createDiscordRuntime(options) {
           } catch (err) {
             if (typeof onError === 'function') {
               onError(err);
+            }
+          }
+          return;
+        }
+
+        if (payload.commandName === 'resume') {
+          if (!sessionManager || !payload.contextId) {
+            try {
+              await payload.interaction.reply('Session manager is not available.');
+            } catch (err) {
+              if (typeof onError === 'function') {
+                onError(err);
+              }
+            }
+            return;
+          }
+
+          try {
+            const sessions = await sessionManager.listSessions(payload.contextId);
+            
+            if (sessions.length === 0) {
+              await payload.interaction.reply('No previous sessions found for this channel.');
+              return;
+            }
+
+            // Create select menu options from sessions
+            const options = sessions.slice(0, 25).map((session, index) => { // Discord allows max 25 options
+              const timestamp = new Date(session.created || session.modified);
+              const timeAgo = formatTimeAgo(timestamp);
+              // Extract text without time injection prefix for cleaner preview
+              let preview = session.firstMessage || 'No preview available';
+              // Remove time injection prefix if present (format: <Current Time: ...>\n)
+              preview = preview.replace(/<Current Time:.*?>[\r\n]*/, '').trim();
+              // Discord select menu label limit: 100 chars, description limit: 100 chars
+              const truncatedPreview = preview.length > 60 ? preview.slice(0, 60) + '...' : preview;
+              const label = `Session ${index + 1}: ${truncatedPreview}`.slice(0, 100);
+              const description = `${timeAgo} - ${session.messageCount || 0} messages`.slice(0, 100);
+              
+              return {
+                label,
+                description,
+                value: path.basename(session.path),
+              };
+            });
+
+            const selectMenu = new StringSelectMenuBuilder()
+              .setCustomId('resume_session_select')
+              .setPlaceholder('Select a session to resume')
+              .addOptions(options);
+
+            const row = new ActionRowBuilder().addComponents(selectMenu);
+
+            await payload.interaction.reply({
+              content: `Found ${sessions.length} session(s). Select one to resume:`,
+              components: [row],
+            });
+          } catch (err) {
+            console.error('DEBUG: Error in /resume:', err.message);
+            if (err.errors) {
+              console.error('DEBUG: Validation errors:', JSON.stringify(err.errors, null, 2));
+            }
+            console.error('DEBUG: Options that failed:', JSON.stringify(options, null, 2));
+            if (typeof onError === 'function') {
+              onError(err);
+            }
+            try {
+              await payload.interaction.reply('Failed to list sessions. Please try again.');
+            } catch (replyErr) {
+              // Ignore secondary errors
+            }
+          }
+          return;
+        }
+
+        // Handle select menu interactions for resume
+        if (payload.isSelectMenu && payload.customId === 'resume_session_select') {
+          if (!sessionManager || !payload.contextId) {
+            try {
+              await payload.interaction.reply('Session manager is not available.');
+            } catch (err) {
+              if (typeof onError === 'function') {
+                onError(err);
+              }
+            }
+            return;
+          }
+
+          try {
+            const selectedFilePath = payload.values[0];
+            if (!selectedFilePath) {
+              await payload.interaction.reply('No session selected.');
+              return;
+            }
+
+            // Switch to the selected session
+            sessionManager.switchToSession(payload.contextId, selectedFilePath);
+            
+            await payload.interaction.reply('Session resumed. Ready to continue.');
+          } catch (err) {
+            if (typeof onError === 'function') {
+              onError(err);
+            }
+            try {
+              await payload.interaction.reply('Failed to resume session. The session file may be corrupt.');
+            } catch (replyErr) {
+              // Ignore secondary errors
             }
           }
           return;

@@ -78,7 +78,14 @@
     - Empty session context after `/new`
     - Listing old sessions preserved by `/new`
   - **Note**: Confirmation message properly mentions `/resume` for accessing previous sessions
-- [ ] **Step C.2**: Implement `/resume` command
+- [x] **Step C.2**: Implement `/resume` command
+  - **Implementation**: Updated `/resume` command to list sessions using Discord select menus
+  - **Fix**: Used `path.basename()` for select menu values to avoid Discord's 100-character limit
+  - **Tests**: Created `test/app/commands/resume.test.js` with 6 passing tests covering:
+    - Select menu generation with previews and timestamps
+    - Session switching and context restoration
+    - Empty session handling
+    - Current session resumption
 - [ ] **Step C.3**: Implement `/compact` command
 - [ ] **Step C.4**: Implement `/fork` command
 
