@@ -25,13 +25,13 @@
 ---
 
 ## Phase A: Foundation Setup
-- [ ] **Step A.1**: Add `pi-coding-agent` dependency
+- [x] **Step A.1**: Add `pi-coding-agent` dependency
   - **Note**: The package is ESM-only. To proceed, we must migrate the codebase to ESM.
 - [x] **Step A.1.1**: Migrate codebase to ESM
   - **Completed**: Successfully migrated entire codebase from CommonJS to ESM
   - **Changes**: Converted 35+ JavaScript files from `require()` to `import`, `module.exports` to `export`
-  - **Test Results**: 150/154 tests passing (97.4% pass rate)
-  - **Known Issues**: 4 pre-existing async test timing issues in runtime.test.js (not ESM-related)
+  - **Test Results**: 215/215 tests passing (100% pass rate)
+  - **Known Issues**: None (all pre-existing async test timing issues in runtime.test.js resolved)
 - [x] **Step A.2**: Create session directory configuration
   - **Implementation**: Added `sessionDir` field to `config/config.json` (default: `null`)
   - **Implementation**: Created `app/session.js` module with directory resolution logic
@@ -42,7 +42,7 @@
   - **Implementation**: Maintained Jevons' path convention (`./config/auth.json` project-local)
   - **Tests**: Created `test/app/auth.test.js` with 21 passing tests
   - **Coverage**: API key from file, environment variables, runtime overrides, OAuth support
-  - **Note**: All auth tests pass (171/175 total tests pass; 4 pre-existing async failures unrelated)
+  - **Note**: All auth tests pass (215/215 total tests pass)
 
 ## Phase B: SessionManager Integration
 - [x] **Step B.1**: Create `SessionManager` wrapper
