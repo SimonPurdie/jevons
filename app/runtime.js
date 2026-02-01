@@ -510,8 +510,8 @@ export function createDiscordRuntime(options) {
   }
 
   // Set up DiscordSessionManager for session-based history
-  let sessionManager = null;
-  if (sessionDir) {
+  let sessionManager = options.sessionManager || null;
+  if (!sessionManager && sessionDir) {
     try {
       sessionManager = new DiscordSessionManager({ sessionDir });
     } catch (err) {
@@ -582,6 +582,10 @@ export function createDiscordRuntime(options) {
 
   function isCompactCommand(content) {
     return typeof content === 'string' && content.trim().startsWith('/compact');
+  }
+
+  function isForkCommand(content) {
+    return typeof content === 'string' && content.trim().startsWith('/fork');
   }
 
   const bot = createDiscordBot({
@@ -712,6 +716,116 @@ export function createDiscordRuntime(options) {
           return;
         }
 
+        if (payload.commandName === 'fork') {
+          if (!sessionManager || !payload.contextId) {
+            try {
+              await payload.interaction.reply('Session manager is not available.');
+            } catch (err) {
+              if (typeof onError === 'function') {
+                onError(err);
+              }
+            }
+            return;
+          }
+
+          try {
+            const session = sessionManager.getOrCreate(payload.contextId);
+            const branch = session.sessionManager.getBranch();
+            
+            // Filter for user messages to fork from
+            const userEntries = branch.filter(entry => 
+              entry.type === 'message' && 
+              entry.message && 
+              entry.message.role === 'user'
+            );
+            
+            if (userEntries.length === 0) {
+              await payload.interaction.reply('No user messages found to fork from.');
+              return;
+            }
+
+            // Create select menu options from user messages
+            const options = userEntries.slice(-25).reverse().map((entry, index) => {
+              const msg = entry.message;
+              // Extract text without time injection prefix
+              let text = msg.content || 'No content';
+              if (Array.isArray(text)) {
+                text = extractTextFromBlocks(text) || 'No text content';
+              }
+              text = text.replace(/<Current Time:.*?>[\r\n]*/, '').trim();
+              
+              const truncatedText = text.length > 80 ? text.slice(0, 80) + '...' : text;
+              const timestamp = entry.timestamp ? new Date(entry.timestamp) : new Date(msg.timestamp);
+              const timeLabel = formatTimeAgo(timestamp);
+              
+              return {
+                label: `Message ${userEntries.length - index}: ${truncatedText}`.slice(0, 100),
+                description: `Sent ${timeLabel}`.slice(0, 100),
+                value: entry.id,
+              };
+            });
+
+            const selectMenu = new StringSelectMenuBuilder()
+              .setCustomId('fork_session_select')
+              .setPlaceholder('Select a message to fork from')
+              .addOptions(options);
+
+            const row = new ActionRowBuilder().addComponents(selectMenu);
+
+            await payload.interaction.reply({
+              content: 'Select a message to fork the conversation from:',
+              components: [row],
+            });
+          } catch (err) {
+            if (typeof onError === 'function') {
+              onError(err);
+            }
+            try {
+              await payload.interaction.reply(`Failed to list messages for forking: ${err.message}`);
+            } catch (replyErr) {
+              // Ignore
+            }
+          }
+          return;
+        }
+
+        // Handle select menu interactions for fork
+        if (payload.isSelectMenu && payload.customId === 'fork_session_select') {
+          if (!sessionManager || !payload.contextId) {
+            try {
+              await payload.interaction.reply('Session manager is not available.');
+            } catch (err) {
+              if (typeof onError === 'function') {
+                onError(err);
+              }
+            }
+            return;
+          }
+
+          try {
+            const selectedEntryId = payload.values[0];
+            if (!selectedEntryId) {
+              await payload.interaction.reply('No message selected.');
+              return;
+            }
+
+            // Fork the session
+            sessionManager.forkSession(payload.contextId, selectedEntryId);
+            
+            await payload.interaction.reply('Forked session. You can now continue from that point.');
+          } catch (err) {
+            if (typeof onError === 'function') {
+              onError(err);
+            }
+            try {
+              await payload.interaction.reply(`Failed to fork session: ${err.message}`);
+            } catch (replyErr) {
+              // Ignore
+            }
+          }
+          return;
+        }
+
         if (payload.commandName === 'compact') {
           if (!sessionManager || !payload.contextId) {
             try {
@@ -830,6 +944,106 @@ export function createDiscordRuntime(options) {
               });
             } catch (sendErr) {
               // Ignore secondary errors
+            }
+          }
+          return;
+        }
+
+        // Handle /fork command
+        if (isForkCommand(payload.content)) {
+          if (!sessionManager || !payload.contextId) {
+            try {
+              await sendMessage({
+                content: 'Session manager is not available.',
+                channelId: payload.channelId,
+                threadId: payload.threadId,
+                contextId: payload.contextId,
+                messageId: payload.messageId,
+                authorId: payload.authorId,
+              });
+            } catch (err) {
+              if (typeof onError === 'function') {
+                onError(err);
+              }
+            }
+            return;
+          }
+
+          try {
+            const session = sessionManager.getOrCreate(payload.contextId);
+            const branch = session.sessionManager.getBranch();
+            
+            // Filter for user messages to fork from
+            const userEntries = branch.filter(entry => 
+              entry.type === 'message' && 
+              entry.message && 
+              entry.message.role === 'user'
+            );
+            
+            if (userEntries.length === 0) {
+              await sendMessage({
+                content: 'No user messages found to fork from.',
+                channelId: payload.channelId,
+                threadId: payload.threadId,
+                contextId: payload.contextId,
+                messageId: payload.messageId,
+                authorId: payload.authorId,
+              });
+              return;
+            }
+
+            // Create select menu options from user messages
+            const options = userEntries.slice(-25).reverse().map((entry, index) => {
+              const msg = entry.message;
+              // Extract text without time injection prefix
+              let text = msg.content || 'No content';
+              if (Array.isArray(text)) {
+                text = extractTextFromBlocks(text) || 'No text content';
+              }
+              text = text.replace(/<Current Time:.*?>[\r\n]*/, '').trim();
+              
+              const truncatedText = text.length > 80 ? text.slice(0, 80) + '...' : text;
+              const timestamp = entry.timestamp ? new Date(entry.timestamp) : new Date(msg.timestamp);
+              const timeLabel = formatTimeAgo(timestamp);
+              
+              return {
+                label: `Message ${userEntries.length - index}: ${truncatedText}`.slice(0, 100),
+                description: `Sent ${timeLabel}`.slice(0, 100),
+                value: entry.id,
+              };
+            });
+
+            const selectMenu = new StringSelectMenuBuilder()
+              .setCustomId('fork_session_select')
+              .setPlaceholder('Select a message to fork from')
+              .addOptions(options);
+
+            const row = new ActionRowBuilder().addComponents(selectMenu);
+
+            await sendMessage({
+              content: 'Select a message to fork the conversation from:',
+              components: [row],
+              channelId: payload.channelId,
+              threadId: payload.threadId,
+              contextId: payload.contextId,
+              messageId: payload.messageId,
+              authorId: payload.authorId,
+            });
+          } catch (err) {
+            if (typeof onError === 'function') {
+              onError(err);
+            }
+            try {
+              await sendMessage({
+                content: `Failed to list messages for forking: ${err.message}`,
+                channelId: payload.channelId,
+                threadId: payload.threadId,
+                contextId: payload.contextId,
+                messageId: payload.messageId,
+                authorId: payload.authorId,
+              });
+            } catch (sendErr) {
+              // Ignore
             }
           }
           return;

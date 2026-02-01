@@ -94,7 +94,16 @@
     - Manual compaction triggering and summary generation
     - Custom instructions support
     - Slash command interaction handling
-- [ ] **Step C.4**: Implement `/fork` command
+- [x] **Step C.4**: Implement `/fork` command
+  - **Implementation**: Added `forkSession()` to `DiscordSessionManager` that uses `createBranchedSession()` and `open()`
+  - **Implementation**: Added `/fork` handler to `app/runtime.js` (slash and text command)
+  - **Features**: Lists last 25 user messages in a select menu for fork point selection
+  - **Fix**: Updated `createDiscordRuntime` to allow passing an external `DiscordSessionManager` for testability
+  - **Tests**: Created `test/app/commands/fork.test.js` with 3 passing tests covering:
+    - Slash command menu generation from branch entries
+    - Forking from a selected message ID and switching to the branched session
+    - Text command support
+  - **Note**: Forked sessions properly inherit history only up to the fork point as verified by tests
 
 ## Phase D: Legacy Code Removal
 - [ ] **Step D.1**: Remove custom history system

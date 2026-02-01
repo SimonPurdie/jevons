@@ -26,6 +26,9 @@ async function registerCommands() {
                 option.setName('instructions')
                     .setDescription('Optional: Custom focus for the summary')
                     .setRequired(false)),
+        new SlashCommandBuilder()
+            .setName('fork')
+            .setDescription('Branch conversation from an earlier message'),
     ].map(command => command.toJSON());
 
     const rest = new REST({ version: '10' }).setToken(discordConfig.token);

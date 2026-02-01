@@ -173,6 +173,42 @@ export class DiscordSessionManager {
     }
 
     /**
+     * Fork the current session from a specific message ID.
+     *
+     * @param {string} contextId - Discord channel or thread ID
+     * @param {string} entryId - The ID of the message to fork from
+     * @returns {DiscordSession} The new branched session
+     */
+    forkSession(contextId, entryId) {
+        if (!contextId || typeof contextId !== 'string') {
+            throw new Error('Context ID is required and must be a string');
+        }
+        if (!entryId || typeof entryId !== 'string') {
+            throw new Error('Entry ID is required and must be a string');
+        }
+
+        const session = this.getActiveSession(contextId);
+        if (!session) {
+            throw new Error('No active session to fork from');
+        }
+
+        // createBranchedSession returns the path to the new session file
+        const branchedSessionPath = session.sessionManager.createBranchedSession(entryId);
+        
+        // Open the new branched session
+        const contextSessionDir = this._getContextSessionDir(contextId);
+        const branchedManager = PiSessionManager.open(branchedSessionPath, contextSessionDir);
+        
+        this.sessions.set(contextId, branchedManager);
+
+        return {
+            contextId,
+            sessionManager: branchedManager,
+            isActive: true,
+        };
+    }
+
+    /**
      * Get the active session for a context if one exists.
      *
      * @param {string} contextId - Discord channel or thread ID
