@@ -42,3 +42,7 @@ export { func };
 **pi-coding-agent API nuances**
 - `SessionManager.createBranchedSession(entryId)` returns a **string** containing the absolute path to the new session file, NOT a `SessionManager` instance. You must call `SessionManager.open(path)` on the returned string to get a manager for the new branched session.
 - `sessionManager.buildSessionContext().messages` returns model-ready message objects without the internal `id` fields. To get messages with their entry IDs (e.g., for forking), use `sessionManager.getBranch()` which returns raw entries containing `id`, `type`, `timestamp`, and `message` properties.
+- **Session Persistence**: `SessionManager` from `pi-coding-agent` only flushes to disk once the first **assistant** message is appended. User-only sessions remain in memory only. The migration script and tests now reflect this behavior.
+
+**Environment Configuration**
+- Added `JEVONS_SESSION_DIR` to the configuration environment map (`app/config.js`). This allows overriding the session directory via environment variables, which is particularly useful for containerized deployments and testing.

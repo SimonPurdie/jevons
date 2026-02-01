@@ -112,4 +112,8 @@
   - **Tests**: All 212 tests passed after removal
 
 ## Phase E: Migration of Existing Data
-- [ ] **Step E.1**: Create migration script
+- [x] **Step E.1**: Create migration script
+  - **Implementation**: Created `scripts/migrate-history.js` to convert legacy markdown logs to JSONL sessions
+  - **Features**: Grouping by contextId, timestamp preservation, non-destructive (original files kept)
+  - **Tests**: Created `test/scripts/migrate-history.test.js` with 3 passing tests
+  - **Refactor**: Updated `app/config.js` to include `JEVONS_SESSION_DIR` in `ENV_MAP` for easier configuration
