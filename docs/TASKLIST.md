@@ -81,12 +81,9 @@
 - [ ] **Step C.2**: Implement `/resume` command
 - [ ] **Step C.3**: Implement `/compact` command
 - [ ] **Step C.4**: Implement `/fork` command
-- [ ] **Step C.5**: Implement `/tree` command
 
-## Phase D: Cleanup and Deprecation
-- [ ] **Step D.1**: Deprecate custom history modules
-- [ ] **Step D.2**: Remove legacy dependencies
-- [ ] **Step D.3**: Archive old history directory
+## Phase D: Legacy Code Removal
+- [ ] **Step D.1**: Remove custom history system
 
 ## Phase E: Migration of Existing Data
 - [ ] **Step E.1**: Create migration script

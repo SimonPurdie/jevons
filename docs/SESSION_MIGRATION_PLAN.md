@@ -5,8 +5,8 @@
 This document outlines a comprehensive plan to migrate Jevons from its current manual chat history handling to the idiomatic session management provided by `@mariozechner/pi-coding-agent`'s `SessionManager`. This migration will:
 
 1. **Replace** the custom `history/` system (`chatHistory.js`, `logWriter.js`, `logReader.js`) with `SessionManager`
-2. **Implement** Discord slash commands mirroring pi-coding-agent's session features: `/new`, `/resume`, `/compact`, `/fork`, `/tree`
-3. **Preserve** existing conversation logging semantics while gaining tree-based branching and compaction
+2. **Implement** Discord slash commands mirroring pi-coding-agent's session features: `/new`, `/resume`, `/compact`, `/fork`
+3. **Preserve** existing conversation logging semantics while gaining branching and compaction
 
 ---
 
@@ -138,7 +138,6 @@ await session.newSession()                     // /new equivalent
 await session.switchSession(path)              // /resume equivalent
 await session.compact()                        // /compact equivalent
 await session.fork(entryId)                    // /fork equivalent
-await session.navigateTree(targetId, options)  // /tree equivalent
 ```
 
 ---
@@ -572,118 +571,32 @@ Create `test/app/commands/fork.test.js` with tests that verify:
 
 ---
 
-#### Step C.5: Implement `/tree` Command
-
-**Objective:** Create `/tree` command for full tree navigation with optional summarization.
-
-**Contract:**
-- Displays tree structure of conversation
-- Allows navigation to any node
-- Optionally summarizes abandoned branches
-- Works in-place (same session file)
-
-**Implementation:**
-1. Register `/tree` slash command
-2. Render tree structure as text (Discord has no native tree UI)
-3. Use button interactions for navigation
-4. Implement branch summarization
-
-**Discord Interaction Flow:**
-```
-User: /tree
-Bot: 📁 Session Tree
-     ├─ 👤 "Hello, can you help..."
-     │  └─ 🤖 "Of course! I can..."
-     │     ├─ 👤 "Let's try approach A" ← current
-     │     └─ 👤 "Actually, approach B..."
-     
-     [Buttons: Navigate | Summarize Branch]
-User: [Clicks Navigate, selects "approach B"]
-Bot: "Navigated to branch. Summarizing abandoned path... Ready to continue."
-```
-
-**New Slash Command Definition:**
-```javascript
-new SlashCommandBuilder()
-  .setName('tree')
-  .setDescription('Navigate the conversation tree')
-```
-
-**Files Modified:**
-- `scripts/register-commands.js` - Add /tree command
-- `app/runtime.js` - Add /tree handler
-- `app/treeRenderer.js` - New module for tree visualization
-
-**Testing Guidance:**
-
-Create `test/app/commands/tree.test.js` with tests that verify:
-- `/tree` reply content includes a text representation of the tree structure
-- All branches are shown, including abandoned ones
-- The current leaf is clearly marked (e.g., "← current")
-- Navigation buttons/select menu are included in the reply
-- After navigating to a different node, `getLeafId()` returns the new target
-- Branch summarization creates a `branch_summary` entry when enabled
-- Tree display handles deep nesting gracefully (consider truncation)
 
 ---
 
-### Phase D: Cleanup and Deprecation
+### Phase D: Legacy Code Removal
 
-#### Step D.1: Deprecate Custom History Modules
+#### Step D.1: Remove Custom History System
 
-**Objective:** Mark old history modules as deprecated but keep for reference.
-
-**Contract:**
-- Old modules still exist but are unused
-- Deprecation warnings in code
-- Migration notes in README
-
-**Implementation:**
-1. Add `@deprecated` JSDoc comments to old modules
-2. Remove imports from actively used code
-3. Update README with migration notes
-
-**Files Modified:**
-- `history/chatHistory.js` - Add deprecation notice
-- `history/logs/logWriter.js` - Add deprecation notice
-- `history/logs/logReader.js` - Add deprecation notice
-- `README.md` - Add migration notes
-
----
-
-#### Step D.2: Remove Legacy Dependencies
-
-**Objective:** Remove code paths that used the old history system.
+**Objective:** Delete all code related to the old history system.
 
 **Contract:**
+- Old modules are deleted from the filesystem
 - No code references old history modules
 - Tests pass without old modules
 - Build is clean
 
 **Implementation:**
-1. Remove old imports from `app/runtime.js`
-2. Update or remove old tests
-3. Clean up unused configuration
+1. Delete `history/` directory
+2. Remove old imports and logic from `app/runtime.js`
+3. Remove old tests in `test/history/`
+4. Clean up unused configuration in `config.json`
 
-**Files Modified:**
-- `app/runtime.js` - Remove old imports and functions
-- `test/history/*.test.js` - Archive or update tests
-
----
-
-#### Step D.3: Archive Old History Directory
-
-**Objective:** Move old `history/` code to archive location.
-
-**Contract:**
-- Old code preserved for reference
-- Not included in production
-- Clear separation from active code
-
-**Implementation:**
-1. Move `history/` to `archive/history/` or similar
-2. Update `.gitignore` if needed
-3. Document archival in CHANGELOG
+**Files Removed:**
+- `history/chatHistory.js`
+- `history/logs/logWriter.js`
+- `history/logs/logReader.js`
+- `test/history/*.test.js`
 
 ---
 
@@ -735,13 +648,10 @@ Phase C: Discord Commands (3-4 days)
 ├── C.1 Refactor /new command
 ├── C.2 Implement /resume command
 ├── C.3 Implement /compact command
-├── C.4 Implement /fork command
-└── C.5 Implement /tree command
+└── C.4 Implement /fork command
 
-Phase D: Cleanup (1 day)
-├── D.1 Deprecate custom history modules
-├── D.2 Remove legacy dependencies
-└── D.3 Archive old history directory
+Phase D: Removal (1 day)
+└── D.1 Remove legacy history system
 
 Phase E: Migration (Optional, 0.5 days)
 └── E.1 Create migration script
@@ -763,7 +673,7 @@ Phase E: Migration (Optional, 0.5 days)
 ### Rollback Strategy
 
 If issues arise:
-1. Revert to old `history/` modules (still in archive)
+1. Revert using Git history
 2. SessionManager is file-based; sessions can be manually inspected
 3. No database migrations; reverting is code-only
 
@@ -777,7 +687,6 @@ After migration:
 - [ ] `/resume` lists and switches between sessions correctly
 - [ ] `/compact` reduces context while preserving meaning
 - [ ] `/fork` creates new session file from branch point
-- [ ] `/tree` displays and navigates tree structure
 - [ ] Sessions persist across process restarts
 - [ ] No regression in response quality or latency
 
@@ -792,7 +701,6 @@ After migration:
 | `app/session.js` | Session directory configuration |
 | `app/sessionManager.js` | Discord-aware SessionManager wrapper |
 | `app/compaction.js` | Compaction logic |
-| `app/treeRenderer.js` | Tree visualization for Discord |
 | `scripts/migrate-history.js` | (Optional) Migration script |
 | `docs/SESSION_MIGRATION_PLAN.md` | This document |
 
@@ -803,19 +711,17 @@ After migration:
 | `package.json` | Add @mariozechner/pi-coding-agent |
 | `config/config.json` | Add sessionDir field |
 | `app/auth.js` | Simplify to re-export pi's AuthStorage with Jevons' path |
-| `scripts/register-commands.js` | Add /resume, /compact, /fork, /tree |
+| `scripts/register-commands.js` | Add /resume, /compact, /fork |
 | `app/runtime.js` | Major refactor for SessionManager |
 | `app/discord.js` | Add interaction collectors if needed |
 | `app/index.js` | Add session initialization |
 
-### Deprecated/Archived Files
+### Removed Files
 
 | File | Status |
 |------|--------|
-| `history/chatHistory.js` | Deprecated → Archive |
-| `history/logs/logWriter.js` | Deprecated → Archive |
-| `history/logs/logReader.js` | Deprecated → Archive |
-| `test/history/*.test.js` | Update or Archive |
+| `history/` | Deleted |
+| `test/history/` | Deleted |
 
 ---
 
@@ -842,10 +748,6 @@ const commands = [
   new SlashCommandBuilder()
     .setName('fork')
     .setDescription('Branch from an earlier point in the conversation'),
-  
-  new SlashCommandBuilder()
-    .setName('tree')
-    .setDescription('Navigate the conversation tree'),
 ].map(command => command.toJSON());
 ```
 
@@ -855,6 +757,5 @@ const commands = [
 
 - [pi-coding-agent Session Documentation](/tmp/package/docs/session.md)
 - [pi-coding-agent SDK Documentation](/tmp/package/docs/sdk.md)
-- [pi-coding-agent Tree Navigation](/tmp/package/docs/tree.md)
 - [SessionManager TypeScript Definitions](/tmp/package/dist/core/session-manager.d.ts)
 - [AgentSession TypeScript Definitions](/tmp/package/dist/core/agent-session.d.ts)
