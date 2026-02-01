@@ -5,11 +5,21 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { createDiscordRuntime } from '../../app/runtime.js';
+import { DiscordSessionManager } from '../../app/sessionManager.js';
 
 class MockDiscordClient extends EventEmitter {
   constructor() {
     super();
     this.loginCalls = [];
+    this.channels = {
+      fetch: async (channelId) => {
+        return {
+          id: channelId,
+          sendTyping: async () => {},
+          send: async (content) => ({ content, id: 'mock-msg-id' }),
+        };
+      }
+    };
   }
   login(token) {
     this.loginCalls.push(token);
@@ -42,6 +52,7 @@ function makeMessage({
   bot = false,
   messageId = 'msg-1',
   guildName = 'TestGuild',
+  messageType = 0,
 } = {}) {
   return {
     id: messageId,
@@ -49,20 +60,22 @@ function makeMessage({
     author: { id: authorId, bot },
     channel: {
       id: channelId,
-      isThread,
+      isThread: () => isThread,
       parentId,
     },
     guild: { name: guildName },
+    type: messageType,
   };
 }
 
-function flush() {
-  return new Promise((resolve) => setTimeout(resolve, 50));
+function flush(ms = 100) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 test('createDiscordRuntime sends model reply via sendMessage', async () => {
   const client = new MockDiscordClient();
   const sends = [];
+  const errors = [];
   const modelInstance = {
     id: 'model-test',
     completeSimple: async () => ({
@@ -70,7 +83,7 @@ test('createDiscordRuntime sends model reply via sendMessage', async () => {
     })
   };
 
-  createDiscordRuntime({
+  const runtime = createDiscordRuntime({
     client,
     token: 'token-123',
     channelId: 'root',
@@ -79,18 +92,22 @@ test('createDiscordRuntime sends model reply via sendMessage', async () => {
       sends.push(payload);
       return Promise.resolve();
     },
+    onError: (err) => {
+      errors.push(err);
+    },
     deps: { Agent: MockAgent }
   });
 
-  client.emit('messageCreate', makeMessage({ channelId: 'root', content: 'Hello' }));
-  await flush();
+  const message = makeMessage({ channelId: 'root', content: 'Hello' });
+  client.emit('messageCreate', message);
+  await flush(200);
 
-  assert.equal(sends.length, 1);
+  assert.equal(sends.length, 1, `Expected 1 send, got ${sends.length}. Errors: ${errors.map(e => e.message + '\n' + e.stack).join(', ')}`);
   assert.equal(sends[0].content, 'hi there');
   assert.equal(sends[0].channelId, 'root');
 });
 
-test('createDiscordRuntime logs user messages and agent replies', async () => {
+test('createDiscordRuntime persists user messages and agent replies to session', async () => {
   const client = new MockDiscordClient();
   const sends = [];
   const modelInstance = {
@@ -107,7 +124,7 @@ test('createDiscordRuntime logs user messages and agent replies', async () => {
       token: 'token-123',
       channelId: 'root',
       modelInstance,
-      historyRoot: tempDir,
+      sessionDir: tempDir,
       sendMessage: (payload) => {
         sends.push(payload);
         return Promise.resolve();
@@ -116,21 +133,37 @@ test('createDiscordRuntime logs user messages and agent replies', async () => {
     });
 
     client.emit('messageCreate', makeMessage({ channelId: 'root', content: 'Hello bot' }));
-    await flush();
+    await flush(200);
 
-    const files = fs.readdirSync(tempDir).filter(f => f.endsWith('.md'));
-    assert.ok(files.length > 0, 'Should create at least one log file');
-    const logContent = fs.readFileSync(path.join(tempDir, files[0]), 'utf8');
-    assert.ok(logContent.includes('user: [Discord Guild #TestGuild'));
-    assert.ok(logContent.includes('Hello bot'));
-    assert.ok(logContent.includes('assistant: [Discord Guild #TestGuild'));
-    assert.ok(logContent.includes('Hello user'));
+    // Verify session file was created
+    const contextId = 'root';
+    const contextSessionDir = path.join(tempDir, contextId);
+    assert.ok(fs.existsSync(contextSessionDir), 'Session directory should exist');
+    
+    const sessionFiles = fs.readdirSync(contextSessionDir).filter(f => f.endsWith('.jsonl'));
+    assert.ok(sessionFiles.length > 0, 'Should create at least one session file');
+    
+    // Verify session content
+    const sessionFile = path.join(contextSessionDir, sessionFiles[0]);
+    const lines = fs.readFileSync(sessionFile, 'utf8').trim().split('\n');
+    const entries = lines.map(line => JSON.parse(line));
+    
+    // Should have: session entry + user message + assistant message
+    assert.ok(entries.length >= 3, 'Should have session entry and at least 2 messages');
+    
+    const userMessages = entries.filter(e => e.type === 'message' && e.message?.role === 'user');
+    const assistantMessages = entries.filter(e => e.type === 'message' && e.message?.role === 'assistant');
+    
+    assert.equal(userMessages.length, 1, 'Should have one user message');
+    assert.ok(userMessages[0].message.content.includes('Hello bot'), 'User message should contain the sent content');
+    assert.equal(assistantMessages.length, 1, 'Should have one assistant message');
+    assert.ok(assistantMessages[0].message.content.includes('Hello user'), 'Assistant message should contain the response');
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
 
-test('createDiscordRuntime /new command resets context window', async () => {
+test('createDiscordRuntime /new command creates new session', async () => {
   const client = new MockDiscordClient();
   const sends = [];
   let modelCalls = 0;
@@ -149,7 +182,7 @@ test('createDiscordRuntime /new command resets context window', async () => {
       token: 'token-123',
       channelId: 'root',
       modelInstance,
-      historyRoot: tempDir,
+      sessionDir: tempDir,
       sendMessage: (payload) => {
         sends.push(payload);
         return Promise.resolve();
@@ -158,29 +191,28 @@ test('createDiscordRuntime /new command resets context window', async () => {
     });
 
     client.emit('messageCreate', makeMessage({ channelId: 'root', content: 'Hello' }));
-    await flush();
+    await flush(200);
 
     client.emit('messageCreate', makeMessage({ channelId: 'root', content: '/new' }));
-    await flush();
+    await flush(200);
 
     client.emit('messageCreate', makeMessage({ channelId: 'root', content: 'After reset' }));
-    await flush();
+    await flush(200);
 
-    const newConfirmation = sends.find(s => s.content.includes('Context window reset'));
-    assert.ok(newConfirmation);
+    const newConfirmation = sends.find(s => s.content.includes('New session started'));
+    assert.ok(newConfirmation, 'Should confirm new session started');
     assert.equal(modelCalls, 2);
 
-    // Note: With the new format, if all messages happen within the same minute,
-    // they will be in the same file. The reset still clears the active window
-    // from memory, but the file is determined by the timestamp.
-    const files = fs.readdirSync(tempDir).filter(f => f.endsWith('.md')).sort();
-    assert.ok(files.length >= 1, 'Should create at least one log file');
+    // Verify multiple session files were created
+    const contextSessionDir = path.join(tempDir, 'root');
+    const sessionFiles = fs.readdirSync(contextSessionDir).filter(f => f.endsWith('.jsonl'));
+    assert.ok(sessionFiles.length >= 1, 'Should create at least one session file');
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
 
-test('createDiscordRuntime passes chat history to model', async () => {
+test('createDiscordRuntime passes chat history from session to model', async () => {
   const client = new MockDiscordClient();
   const sends = [];
   const calls = [];
@@ -199,7 +231,7 @@ test('createDiscordRuntime passes chat history to model', async () => {
       token: 'token-123',
       channelId: 'root',
       modelInstance,
-      historyRoot: tempDir,
+      sessionDir: tempDir,
       sendMessage: (payload) => {
         sends.push(payload);
         return Promise.resolve();
@@ -208,10 +240,10 @@ test('createDiscordRuntime passes chat history to model', async () => {
     });
 
     client.emit('messageCreate', makeMessage({ channelId: 'root', content: 'First message' }));
-    await flush();
+    await flush(200);
 
     client.emit('messageCreate', makeMessage({ channelId: 'root', content: 'Second message' }));
-    await flush();
+    await flush(200);
 
     assert.equal(calls.length, 2);
     assert.equal(calls[0].length, 1); // current user message

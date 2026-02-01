@@ -1,7 +1,5 @@
 import { createDiscordBot, sendDiscordMessage } from './discord.js';
-import { createContextWindowResolver } from '../history/logs/logWriter.js';
-import { readLogEntry } from '../history/logs/logReader.js';
-import { readChatHistory } from '../history/chatHistory.js';
+import { DiscordSessionManager } from './sessionManager.js';
 import { loadSkill } from '../skills/loader.js';
 import { createBashTool } from './tools/bash.js';
 import fs from 'fs';
@@ -357,10 +355,17 @@ export async function generateReply(payload, modelInstance, options = {}) {
 
   const { Agent: AgentClass } = options.Agent ? { Agent: options.Agent } : await (options.resolvePiAgentCore || resolvePiAgentCore)();
 
+  // Get session context for this Discord context
+  let sessionContext = { messages: [] };
+  if (options.sessionManager && payload.contextId) {
+    const session = options.sessionManager.getOrCreate(payload.contextId);
+    sessionContext = session.sessionManager.buildSessionContext();
+  }
+
   const workspaceFileNames = ['AGENTS.md', 'SOUL.md', 'TOOLS.md', 'IDENTITY.md', 'USER.md'];
   const workspaceFilesContent = readWorkspaceFiles(workspaceFileNames, '/home/simon/jevons');
   const systemPrompt = buildSystemPrompt(options.skills, workspaceFilesContent);
-  const historyMessages = normalizeHistoryMessages(options.chatHistory || [], modelInstance);
+  const historyMessages = normalizeHistoryMessages(sessionContext.messages || [], modelInstance);
 
   const agent = new AgentClass({
     initialState: {
@@ -388,6 +393,16 @@ export async function generateReply(payload, modelInstance, options = {}) {
     timestamp: Date.now(),
   });
 
+  // Persist user message to session before prompting
+  if (options.sessionManager && payload.contextId) {
+    const session = options.sessionManager.getOrCreate(payload.contextId);
+    session.sessionManager.appendMessage({
+      role: 'user',
+      content,
+      timestamp: Date.now(),
+    });
+  }
+
   await agent.prompt({
     role: 'user',
     content,
@@ -397,6 +412,17 @@ export async function generateReply(payload, modelInstance, options = {}) {
   logAgentInteraction(agent, content, Date.now());
 
   const reply = extractLatestAssistantText(agent.state.messages);
+  
+  // Persist assistant response to session
+  if (options.sessionManager && payload.contextId && reply && reply.trim()) {
+    const session = options.sessionManager.getOrCreate(payload.contextId);
+    session.sessionManager.appendMessage({
+      role: 'assistant',
+      content: reply,
+      timestamp: Date.now(),
+    });
+  }
+
   if (!reply || !reply.trim()) {
     const hasToolCalls = agent.state.messages.some(m => m.role === 'assistant' && Array.isArray(m.content) && m.content.some(c => c.type === 'tool_call'));
     if (hasToolCalls) {
@@ -423,7 +449,7 @@ export function createDiscordRuntime(options) {
     sendMessage,
     onReady,
     onError,
-    historyRoot,
+    sessionDir,
     skillsDir,
     ipcPort,
     deps = {},
@@ -450,46 +476,16 @@ export function createDiscordRuntime(options) {
     }
   }
 
-  // Set up context window resolver for logging if historyRoot is provided
-  const windowResolver = historyRoot ? createContextWindowResolver({ historyRoot }) : null;
-
-  function getSurfaceFromContext(contextId, threadId) {
-    return threadId ? 'discord-thread' : 'discord-channel';
-  }
-
-  function logEvent(payload, role, content, metadata) {
-    if (!windowResolver) {
-      return;
+  // Set up DiscordSessionManager for session-based history
+  let sessionManager = null;
+  if (sessionDir) {
+    try {
+      sessionManager = new DiscordSessionManager({ sessionDir });
+    } catch (err) {
+      if (typeof onError === 'function') {
+        onError(new Error(`Failed to initialize session manager: ${err.message}`));
+      }
     }
-    const surface = getSurfaceFromContext(payload.contextId, payload.threadId);
-    const context = {
-      surface,
-      contextId: payload.contextId,
-      guildName: payload.guildName || 'Unknown',
-    };
-    const window = windowResolver.getOrCreateContextWindow(surface, payload.contextId, context);
-    window.append({
-      timestamp: new Date().toISOString(),
-      role,
-      content,
-      authorName: metadata?.authorName || (role === 'user' ? 'user' : 'assistant'),
-      messageId: metadata?.messageId,
-    });
-  }
-
-  function getChatHistoryForContext(contextId, threadId, guildName) {
-    if (!windowResolver) {
-      return [];
-    }
-    const surface = getSurfaceFromContext(contextId, threadId);
-    const context = {
-      surface,
-      contextId,
-      guildName: guildName || 'Unknown',
-    };
-    const window = windowResolver.getOrCreateContextWindow(surface, contextId, context);
-    // Read history from the current window's log file
-    return readChatHistory(window.path);
   }
 
   function startTypingLoop(contextId) {
@@ -560,17 +556,11 @@ export function createDiscordRuntime(options) {
     onInteraction: (payload) => {
       (async () => {
         if (payload.commandName === 'new') {
-          if (windowResolver) {
-            const surface = getSurfaceFromContext(payload.contextId, payload.threadId);
-            const context = {
-              surface,
-              contextId: payload.contextId,
-              guildName: payload.guildName || 'Unknown',
-            };
-            windowResolver.resetContextWindow(surface, payload.contextId, context);
+          if (sessionManager && payload.contextId) {
+            sessionManager.newSession(payload.contextId);
           }
           try {
-            await payload.interaction.reply('Context window reset. Starting fresh conversation.');
+            await payload.interaction.reply('New session started. Use /resume to access previous sessions.');
           } catch (err) {
             if (typeof onError === 'function') {
               onError(err);
@@ -584,18 +574,12 @@ export function createDiscordRuntime(options) {
       (async () => {
         // Handle /new command: reset context window and confirm
         if (isNewCommand(payload.content)) {
-          if (windowResolver) {
-            const surface = getSurfaceFromContext(payload.contextId, payload.threadId);
-            const context = {
-              surface,
-              contextId: payload.contextId,
-              guildName: payload.guildName || 'Unknown',
-            };
-            windowResolver.resetContextWindow(surface, payload.contextId, context);
+          if (sessionManager && payload.contextId) {
+            sessionManager.newSession(payload.contextId);
           }
           try {
             await sendMessage({
-              content: 'Context window reset. Starting fresh conversation.',
+              content: 'New session started. Use /resume to access previous sessions.',
               channelId: payload.channelId,
               threadId: payload.threadId,
               contextId: payload.contextId,
@@ -609,15 +593,6 @@ export function createDiscordRuntime(options) {
           }
           return;
         }
-
-        // Get chat history for this context BEFORE logging current message
-        const chatHistory = getChatHistoryForContext(payload.contextId, payload.threadId, payload.guildName);
-
-        // Log user message
-        logEvent(payload, 'user', payload.content, {
-          authorName: payload.authorName || 'user',
-          messageId: payload.messageId,
-        });
 
         // Create tools with per-message IPC context
         const extraEnv = {
@@ -636,7 +611,7 @@ export function createDiscordRuntime(options) {
         try {
           stopTyping = startTypingLoop(payload.contextId);
           reply = await generateReply(payload, resolvedModel, {
-            chatHistory,
+            sessionManager,
             skills: loadedSkills,
             tools: runtimeTools,
             Agent: _Agent,
@@ -645,11 +620,15 @@ export function createDiscordRuntime(options) {
           });
         } catch (err) {
           const errorMessage = formatModelError(err);
-          // Log error as agent response with error metadata
-          logEvent(payload, 'agent', errorMessage, {
-            authorName: 'assistant',
-            messageId: payload.messageId,
-          });
+          // Persist error message to session if available
+          if (sessionManager && payload.contextId) {
+            const session = sessionManager.getOrCreate(payload.contextId);
+            session.sessionManager.appendMessage({
+              role: 'assistant',
+              content: errorMessage,
+              timestamp: Date.now(),
+            });
+          }
           try {
             await sendMessage({
               content: errorMessage,
@@ -675,12 +654,6 @@ export function createDiscordRuntime(options) {
         if (!reply) {
           return;
         }
-
-        // Log agent reply before sending
-        logEvent(payload, 'agent', reply, {
-          authorName: 'assistant',
-          messageId: payload.messageId,
-        });
 
         try {
           await sendMessage({

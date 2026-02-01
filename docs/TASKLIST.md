@@ -51,7 +51,13 @@
   - **Methods**: `getOrCreate()`, `newSession()`, `listSessions()`, `switchToSession()`, `getActiveSession()`, `hasActiveSession()`, `endSession()`, `getActiveContextIds()`, `clearAllSessions()`
   - **Tests**: Created `test/app/sessionManager.test.js` with 42 passing tests
   - **Test Coverage**: Constructor validation, getOrCreate deduplication, session lifecycle, persistence, context operations
-- [ ] **Step B.2**: Migrate Agent creation to use `SessionManager`
+- [x] **Step B.2**: Migrate Agent creation to use `SessionManager`
+  - **Implementation**: Updated `generateReply()` to use `sessionManager.buildSessionContext()` instead of `readChatHistory()`
+  - **Implementation**: Added `sessionManager.appendMessage()` calls to persist user and assistant messages
+  - **Implementation**: Updated `createDiscordRuntime()` to use `DiscordSessionManager` instead of old history system
+  - **Implementation**: Updated `/new` command to use `sessionManager.newSession()` 
+  - **Tests**: Updated existing tests to work with session-based system (4 tests passing)
+  - **Note**: Tests require increased timeout due to async session operations
 - [ ] **Step B.3**: Implement session persistence and recovery
 
 ## Phase C: Discord Command Implementation
