@@ -1,5 +1,6 @@
 import { SessionManager as PiSessionManager } from '@mariozechner/pi-coding-agent';
 import path from 'path';
+import logger from './logger.js';
 
 /**
  * Discord-aware SessionManager wrapper that maps Discord context IDs
@@ -55,7 +56,18 @@ export class DiscordSessionManager {
 
         // Create new session using continueRecent pattern
         const contextSessionDir = this._getContextSessionDir(contextId);
-        const sessionManager = PiSessionManager.continueRecent(this.cwd, contextSessionDir);
+        let sessionManager;
+        
+        try {
+            sessionManager = PiSessionManager.continueRecent(this.cwd, contextSessionDir);
+        } catch (err) {
+            logger.warn(`Corrupt session file detected for context ${contextId}, creating new session`, {
+                contextId,
+                error: err.message,
+            });
+            // Create a fresh session if continueRecent fails
+            sessionManager = PiSessionManager.create(this.cwd, contextSessionDir);
+        }
 
         this.sessions.set(contextId, sessionManager);
 
@@ -104,8 +116,18 @@ export class DiscordSessionManager {
         }
 
         const contextSessionDir = this._getContextSessionDir(contextId);
-        const sessions = await PiSessionManager.list(this.cwd, contextSessionDir);
-        return sessions;
+        
+        try {
+            const sessions = await PiSessionManager.list(this.cwd, contextSessionDir);
+            return sessions;
+        } catch (err) {
+            logger.error(`Failed to list sessions for context ${contextId}`, {
+                contextId,
+                error: err.message,
+            });
+            // Return empty array on error to maintain consistent return type
+            return [];
+        }
     }
 
     /**
@@ -124,7 +146,18 @@ export class DiscordSessionManager {
         }
 
         const contextSessionDir = this._getContextSessionDir(contextId);
-        const sessionManager = PiSessionManager.open(sessionFilePath, contextSessionDir);
+        let sessionManager;
+        
+        try {
+            sessionManager = PiSessionManager.open(sessionFilePath, contextSessionDir);
+        } catch (err) {
+            logger.error(`Failed to open session file for context ${contextId}`, {
+                contextId,
+                sessionFilePath,
+                error: err.message,
+            });
+            throw new Error(`Cannot resume session: session file is corrupt or unreadable. Error: ${err.message}`);
+        }
 
         this.sessions.set(contextId, sessionManager);
 

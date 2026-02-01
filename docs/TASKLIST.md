@@ -58,7 +58,13 @@
   - **Implementation**: Updated `/new` command to use `sessionManager.newSession()` 
   - **Tests**: Updated existing tests to work with session-based system (4 tests passing)
   - **Note**: Tests require increased timeout due to async session operations
-- [ ] **Step B.3**: Implement session persistence and recovery
+- [x] **Step B.3**: Implement session persistence and recovery
+  - **Implementation**: Added error handling for corrupt session files in `DiscordSessionManager`
+  - **Implementation**: `getOrCreate()` now catches errors from `continueRecent()` and creates fresh session on corruption
+  - **Implementation**: `listSessions()` returns empty array gracefully on errors
+  - **Implementation**: `switchToSession()` provides descriptive error message for corrupt files
+  - **Tests**: Created `test/app/session_persistence.test.js` with 11 passing tests
+  - **Test Coverage**: Session file creation/format, session recovery, corrupt file handling, multiple session recovery
 
 ## Phase C: Discord Command Implementation
 - [ ] **Step C.1**: Refactor `/new` command
