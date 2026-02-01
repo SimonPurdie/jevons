@@ -344,6 +344,7 @@ export async function createDiscordRuntime(options) {
     client,
     token,
     channelId,
+    applicationId,
     activeModel,
     models,
     providers,
@@ -462,6 +463,7 @@ export async function createDiscordRuntime(options) {
     client,
     token,
     channelId,
+    applicationId,
     onReady,
     onError,
     onInteraction: (payload) => {

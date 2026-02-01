@@ -1,6 +1,7 @@
-import { REST, Routes, SlashCommandBuilder } from 'discord.js';
+import { REST, Routes } from 'discord.js';
 import { loadConfig } from '../app/config.js';
 import { AuthStorage } from '../app/auth.js';
+import { getCommandDefinitions } from '../app/commands.js';
 import path from 'path';
 
 async function registerCommands() {
@@ -14,24 +15,7 @@ async function registerCommands() {
         process.exit(1);
     }
 
-    const commands = [
-        new SlashCommandBuilder()
-            .setName('new')
-            .setDescription('Start a fresh conversation (old session is preserved)'),
-        new SlashCommandBuilder()
-            .setName('resume')
-            .setDescription('Resume a previous conversation session'),
-        new SlashCommandBuilder()
-            .setName('compact')
-            .setDescription('Summarize older messages to reduce context size')
-            .addStringOption(option =>
-                option.setName('instructions')
-                    .setDescription('Optional: Custom focus for the summary')
-                    .setRequired(false)),
-        new SlashCommandBuilder()
-            .setName('fork')
-            .setDescription('Branch conversation from an earlier message'),
-    ].map(command => command.toJSON());
+    const commands = getCommandDefinitions().map(command => command.toJSON());
 
     const rest = new REST({ version: '10' }).setToken(token);
 

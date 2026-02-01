@@ -1,4 +1,6 @@
 import { EventEmitter } from 'events';
+import { REST, Routes } from 'discord.js';
+import { getCommandDefinitions } from './commands.js';
 
 function isThreadChannel(channel) {
   return Boolean(channel && channel.isThread);
@@ -35,11 +37,56 @@ function extractContext(messageOrInteraction, rootChannelId) {
   return null;
 }
 
+/**
+ * Ensures Discord slash commands are registered and up-to-date.
+ * Compares local command definitions with registered commands and updates if needed.
+ */
+async function ensureCommandsRegistered(client, token, applicationId) {
+  try {
+    const rest = new REST({ version: '10' }).setToken(token);
+    const localCommands = getCommandDefinitions().map(cmd => cmd.toJSON());
+
+    // Fetch currently registered commands
+    const registeredCommands = await rest.get(
+      Routes.applicationCommands(applicationId)
+    );
+
+    // Compare commands by creating a normalized comparison
+    const normalize = (cmd) => JSON.stringify({
+      name: cmd.name,
+      description: cmd.description,
+      options: cmd.options || []
+    });
+
+    const localSet = new Set(localCommands.map(normalize));
+    const registeredSet = new Set(registeredCommands.map(normalize));
+
+    // Check if commands are in sync
+    const needsSync = localCommands.length !== registeredCommands.length ||
+      !localCommands.every(cmd => registeredSet.has(normalize(cmd)));
+
+    if (needsSync) {
+      console.log('[Discord] Commands out of sync. Registering...');
+      await rest.put(
+        Routes.applicationCommands(applicationId),
+        { body: localCommands }
+      );
+      console.log(`[Discord] Successfully registered ${localCommands.length} commands.`);
+    } else {
+      console.log('[Discord] Commands are in sync.');
+    }
+  } catch (err) {
+    console.error('[Discord] Failed to sync commands:', err.message);
+    // Don't throw - bot can still function without slash commands
+  }
+}
+
 export function createDiscordBot(options) {
   const {
     client,
     token,
     channelId,
+    applicationId,
     onMessage,
     onInteraction,
     onReady,
@@ -64,7 +111,12 @@ export function createDiscordBot(options) {
     throw new Error('Discord client must support .on(event, handler)');
   }
 
-  client.on('ready', () => {
+  client.on('ready', async () => {
+    // Sync commands if applicationId is provided
+    if (applicationId) {
+      await ensureCommandsRegistered(client, token, applicationId);
+    }
+
     if (typeof onReady === 'function') {
       onReady();
     }

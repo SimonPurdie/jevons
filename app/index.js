@@ -75,6 +75,7 @@ export async function startDiscordRuntime(deps = {}) {
     client,
     token: token,
     channelId: discordConfig.channel_id,
+    applicationId: discordConfig.application_id,
     activeModel: config.activeModel,
     models: config.models,
     authStorage,

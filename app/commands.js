@@ -1,0 +1,26 @@
+import { SlashCommandBuilder } from 'discord.js';
+
+/**
+ * Returns the canonical command definitions for the Discord bot.
+ * These are used both for registration and runtime sync detection.
+ */
+export function getCommandDefinitions() {
+    return [
+        new SlashCommandBuilder()
+            .setName('new')
+            .setDescription('Start a fresh conversation (old session is preserved)'),
+        new SlashCommandBuilder()
+            .setName('resume')
+            .setDescription('Resume a previous conversation session'),
+        new SlashCommandBuilder()
+            .setName('compact')
+            .setDescription('Summarize older messages to reduce context size')
+            .addStringOption(option =>
+                option.setName('instructions')
+                    .setDescription('Optional: Custom focus for the summary')
+                    .setRequired(false)),
+        new SlashCommandBuilder()
+            .setName('fork')
+            .setDescription('Branch conversation from an earlier message'),
+    ];
+}
