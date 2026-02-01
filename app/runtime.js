@@ -457,6 +457,27 @@ function createDiscordRuntime(options) {
     return readChatHistory(window.path);
   }
 
+  function startTypingLoop(contextId) {
+    const sendTyping = async () => {
+      try {
+        const channel = await client.channels.fetch(contextId);
+        if (channel && typeof channel.sendTyping === 'function') {
+          await channel.sendTyping();
+        }
+      } catch (err) {
+        // Silently fail typing indicator errors
+      }
+    };
+
+    // Send immediately
+    sendTyping();
+
+    // Loop every 9 seconds (Discord typing lasts ~10s)
+    const interval = setInterval(sendTyping, 9000);
+
+    return () => clearInterval(interval);
+  }
+
   let resolvedModel = modelInstance;
   if (!resolvedModel) {
     const piAi = _resolvePiAi();
@@ -575,8 +596,9 @@ function createDiscordRuntime(options) {
         }
         const runtimeTools = [createBashTool(process.cwd(), extraEnv)];
 
-        let reply;
+        let stopTyping = () => { };
         try {
+          stopTyping = startTypingLoop(payload.contextId);
           reply = await generateReply(payload, resolvedModel, {
             chatHistory,
             skills: loadedSkills,
@@ -610,6 +632,8 @@ function createDiscordRuntime(options) {
             onError(err);
           }
           return;
+        } finally {
+          stopTyping();
         }
 
         if (!reply) {
