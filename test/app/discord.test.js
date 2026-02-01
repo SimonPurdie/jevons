@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { EventEmitter } = require('events');
-const { createDiscordBot, extractContext } = require('../../app/discord');
+const { createDiscordBot, extractContext, splitMessage, sendDiscordMessage } = require('../../app/discord');
 
 class MockDiscordClient extends EventEmitter {
   constructor() {
@@ -145,4 +145,44 @@ test('createDiscordBot only allows whitelisted message types', () => {
   assert.equal(received[0].content, 'default');
   assert.equal(received[1].content, 'reply');
   assert.equal(received[2].content, 'starter');
+});
+
+test('splitMessage splits text into chunks', () => {
+  const short = 'hello';
+  assert.deepEqual(splitMessage(short, 10), ['hello']);
+
+  const long = 'this is a long message';
+  // Splits at space before 10
+  assert.deepEqual(splitMessage(long, 10), ['this is a', 'long', 'message']);
+
+  const withNewlines = 'line one\nline two\nline three';
+  assert.deepEqual(splitMessage(withNewlines, 10), ['line one', 'line two', 'line three']);
+
+  const noBreak = 'abcdefghij';
+  assert.deepEqual(splitMessage(noBreak, 5), ['abcde', 'fghij']);
+});
+
+test('sendDiscordMessage sends multiple chunks for long content', async () => {
+  const sentMessages = [];
+  const mockChannel = {
+    send: (msg) => {
+      sentMessages.push(msg);
+      return Promise.resolve({ id: 'msg-' + sentMessages.length });
+    },
+  };
+  const mockClient = {
+    channels: {
+      fetch: () => Promise.resolve(mockChannel),
+    },
+  };
+
+  const longContent = 'A'.repeat(2500);
+  await sendDiscordMessage(mockClient, {
+    content: longContent,
+    channelId: 'root',
+  });
+
+  assert.equal(sentMessages.length, 2);
+  assert.equal(sentMessages[0].length, 2000);
+  assert.equal(sentMessages[1].length, 500);
 });

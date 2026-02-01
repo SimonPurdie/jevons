@@ -1,5 +1,6 @@
 const { Client, GatewayIntentBits } = require('discord.js');
 const { loadConfig } = require('./config');
+const { sendDiscordMessage } = require('./discord');
 const { createDiscordRuntime } = require('./runtime');
 const { createSchedulerService } = require('../scheduler/service');
 const { createIpcServer } = require('./ipc');
@@ -18,23 +19,6 @@ function createDiscordClient() {
   });
 }
 
-function sendDiscordMessage(client, payload) {
-  const { content, channelId, threadId } = payload;
-  let targetId = (threadId && threadId !== 'null') ? threadId : channelId;
-
-  if (targetId === 'null') targetId = null;
-
-  if (!targetId) {
-    return Promise.reject(new Error('Unable to sending message: No valid channelId or threadId provided'));
-  }
-
-  return client.channels.fetch(targetId).then(channel => {
-    if (!channel || typeof channel.send !== 'function') {
-      throw new Error(`Unable to send message to channel ${targetId}`);
-    }
-    return channel.send(content);
-  });
-}
 
 async function startDiscordRuntime(deps = {}) {
   const _loadConfig = deps.loadConfig || loadConfig;

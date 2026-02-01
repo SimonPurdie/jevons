@@ -129,7 +129,62 @@ function createDiscordBot(options) {
   };
 }
 
+function sendDiscordMessage(client, payload) {
+  const { content, channelId, threadId } = payload;
+  let targetId = (threadId && threadId !== 'null') ? threadId : channelId;
+
+  if (targetId === 'null') targetId = null;
+
+  if (!targetId) {
+    return Promise.reject(new Error('Unable to send message: No valid channelId or threadId provided'));
+  }
+
+  const chunks = splitMessage(content);
+
+  return client.channels.fetch(targetId).then(async (channel) => {
+    if (!channel || typeof channel.send !== 'function') {
+      throw new Error(`Unable to send message to channel ${targetId}`);
+    }
+    const results = [];
+    for (const chunk of chunks) {
+      results.push(await channel.send(chunk));
+    }
+    return results.length === 1 ? results[0] : results;
+  });
+}
+
+function splitMessage(text, maxLength = 2000) {
+  if (text.length <= maxLength) {
+    return [text];
+  }
+
+  const chunks = [];
+  let current = text;
+
+  while (current.length > 0) {
+    if (current.length <= maxLength) {
+      chunks.push(current);
+      break;
+    }
+
+    let splitIndex = current.lastIndexOf('\n', maxLength);
+    if (splitIndex === -1 || splitIndex === 0) {
+      splitIndex = current.lastIndexOf(' ', maxLength);
+    }
+    if (splitIndex === -1 || splitIndex === 0) {
+      splitIndex = maxLength;
+    }
+
+    chunks.push(current.substring(0, splitIndex).trim());
+    current = current.substring(splitIndex).trim();
+  }
+
+  return chunks;
+}
+
 module.exports = {
   createDiscordBot,
   extractContext,
+  sendDiscordMessage,
+  splitMessage,
 };

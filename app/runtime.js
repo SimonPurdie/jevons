@@ -183,6 +183,35 @@ function logContextToFile(context) {
   }
 }
 
+function logAgentInteraction(agent, userContent, timestamp) {
+  const logsDir = path.join(process.cwd(), 'logs');
+  const debugLogPath = path.join(logsDir, 'agent_debug.log');
+
+  try {
+    const logEntry = {
+      timestamp: new Date().toISOString(),
+      userPrompt: {
+        content: userContent,
+        timestamp,
+      },
+      systemPrompt: agent.state.systemPrompt,
+      model: agent.state.model ? {
+        provider: agent.state.model.provider,
+        id: agent.state.model.id,
+      } : null,
+      messages: agent.state.messages,
+    };
+
+    const logString = `--- INTERACTION START: ${logEntry.timestamp} ---\n` +
+      JSON.stringify(logEntry, null, 2) +
+      `\n--- INTERACTION END ---\n\n`;
+
+    fs.appendFileSync(debugLogPath, logString, 'utf8');
+  } catch (err) {
+    // Silently fail - logging should not interrupt bot operation
+  }
+}
+
 function extractTextFromBlocks(blocks) {
   if (!Array.isArray(blocks)) {
     return null;
@@ -360,6 +389,8 @@ async function generateReply(payload, modelInstance, options = {}) {
     content,
     timestamp: Date.now(),
   });
+
+  logAgentInteraction(agent, content, Date.now());
 
   const reply = extractLatestAssistantText(agent.state.messages);
   if (!reply || !reply.trim()) {
