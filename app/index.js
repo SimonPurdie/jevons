@@ -6,6 +6,7 @@ import { createSchedulerService } from '../scheduler/service.js';
 import { createIpcServer } from './ipc.js';
 import logger from './logger.js';
 import { AuthStorage } from './auth.js';
+import { getSessionDir } from './session.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -78,6 +79,7 @@ export async function startDiscordRuntime(deps = {}) {
     models: config.models,
     authStorage,
     skillsDir: path.join(__dirname, '../skills'),
+    sessionDir: getSessionDir(config),
     sendMessage,
     ipcPort,
     onReady: () => {
@@ -91,6 +93,7 @@ export async function startDiscordRuntime(deps = {}) {
     onError: (err) => {
       logger.error('Discord runtime error', err);
     },
+    deps,
   });
 
   await runtime.start();

@@ -9,13 +9,17 @@ export function getDefaultSessionDir() {
 }
 
 export function getSessionDir(config) {
-  const configuredDir = config && config.sessionDir;
-  
+  let configuredDir = config && config.sessionDir;
+
   if (configuredDir) {
+    // Expand ~ to home directory
+    if (configuredDir.startsWith('~')) {
+      configuredDir = path.join(os.homedir(), configuredDir.slice(1));
+    }
     const absolutePath = path.resolve(configuredDir);
     return absolutePath;
   }
-  
+
   return getDefaultSessionDir();
 }
 
@@ -30,10 +34,10 @@ export function validateSessionDir(sessionDir) {
   if (!sessionDir) {
     throw new Error('Session directory is required');
   }
-  
+
   if (!path.isAbsolute(sessionDir)) {
     throw new Error(`Session directory must be an absolute path: ${sessionDir}`);
   }
-  
+
   return true;
 }
