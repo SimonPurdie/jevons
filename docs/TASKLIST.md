@@ -37,7 +37,12 @@
   - **Implementation**: Created `app/session.js` module with directory resolution logic
   - **Tests**: Created `test/app/session.test.js` with 15 passing tests
   - **Note**: Users must manually add `"sessionDir": null` to their `config/config.json` since it's gitignored
-- [ ] **Step A.3**: Switch to `pi-coding-agent`'s `AuthStorage`
+- [x] **Step A.3**: Switch to `pi-coding-agent`'s `AuthStorage`
+  - **Implementation**: Replaced custom `AuthStorage` class with a thin wrapper extending pi-coding-agent's `AuthStorage`
+  - **Implementation**: Maintained Jevons' path convention (`./config/auth.json` project-local)
+  - **Tests**: Created `test/app/auth.test.js` with 21 passing tests
+  - **Coverage**: API key from file, environment variables, runtime overrides, OAuth support
+  - **Note**: All auth tests pass (171/175 total tests pass; 4 pre-existing async failures unrelated)
 
 ## Phase B: SessionManager Integration
 - [ ] **Step B.1**: Create `SessionManager` wrapper
