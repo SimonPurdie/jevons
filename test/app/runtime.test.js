@@ -15,7 +15,7 @@ class MockDiscordClient extends EventEmitter {
       fetch: async (channelId) => {
         return {
           id: channelId,
-          sendTyping: async () => {},
+          sendTyping: async () => { },
           send: async (content) => ({ content, id: 'mock-msg-id' }),
         };
       }
@@ -83,7 +83,7 @@ test('createDiscordRuntime sends model reply via sendMessage', async () => {
     })
   };
 
-  const runtime = createDiscordRuntime({
+  const runtime = await createDiscordRuntime({
     client,
     token: 'token-123',
     channelId: 'root',
@@ -119,7 +119,7 @@ test('createDiscordRuntime persists user messages and agent replies to session',
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jevons-runtime-test-'));
 
   try {
-    createDiscordRuntime({
+    await createDiscordRuntime({
       client,
       token: 'token-123',
       channelId: 'root',
@@ -139,21 +139,21 @@ test('createDiscordRuntime persists user messages and agent replies to session',
     const contextId = 'root';
     const contextSessionDir = path.join(tempDir, contextId);
     assert.ok(fs.existsSync(contextSessionDir), 'Session directory should exist');
-    
+
     const sessionFiles = fs.readdirSync(contextSessionDir).filter(f => f.endsWith('.jsonl'));
     assert.ok(sessionFiles.length > 0, 'Should create at least one session file');
-    
+
     // Verify session content
     const sessionFile = path.join(contextSessionDir, sessionFiles[0]);
     const lines = fs.readFileSync(sessionFile, 'utf8').trim().split('\n');
     const entries = lines.map(line => JSON.parse(line));
-    
+
     // Should have: session entry + user message + assistant message
     assert.ok(entries.length >= 3, 'Should have session entry and at least 2 messages');
-    
+
     const userMessages = entries.filter(e => e.type === 'message' && e.message?.role === 'user');
     const assistantMessages = entries.filter(e => e.type === 'message' && e.message?.role === 'assistant');
-    
+
     assert.equal(userMessages.length, 1, 'Should have one user message');
     assert.ok(userMessages[0].message.content.includes('Hello bot'), 'User message should contain the sent content');
     assert.equal(assistantMessages.length, 1, 'Should have one assistant message');
@@ -177,7 +177,7 @@ test('createDiscordRuntime /new command creates new session', async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jevons-runtime-test-'));
 
   try {
-    createDiscordRuntime({
+    await createDiscordRuntime({
       client,
       token: 'token-123',
       channelId: 'root',
@@ -226,7 +226,7 @@ test('createDiscordRuntime passes chat history from session to model', async () 
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jevons-runtime-test-'));
 
   try {
-    createDiscordRuntime({
+    await createDiscordRuntime({
       client,
       token: 'token-123',
       channelId: 'root',

@@ -11,7 +11,7 @@ import { registerApiProvider } from '@mariozechner/pi-ai';
 // Register a mock API provider for summarization
 registerApiProvider({
   api: 'test-api',
-  stream: () => {},
+  stream: () => { },
   streamSimple: (model, context, options) => {
     return {
       result: async () => ({
@@ -31,7 +31,7 @@ class MockDiscordClient extends EventEmitter {
       fetch: async (channelId) => {
         return {
           id: channelId,
-          sendTyping: async () => {},
+          sendTyping: async () => { },
           send: async (content) => ({ content, id: 'mock-msg-id' }),
         };
       }
@@ -99,7 +99,7 @@ test('/compact command triggers compaction and appends compaction entry', async 
   };
 
   try {
-    createDiscordRuntime({
+    await createDiscordRuntime({
       client,
       token: 'token-123',
       channelId: 'test-channel',
@@ -115,8 +115,8 @@ test('/compact command triggers compaction and appends compaction entry', async 
 
     // Send many messages to build up context
     for (let i = 0; i < 10; i++) {
-        client.emit('messageCreate', makeMessage({ channelId: 'test-channel', content: `Message ${i}` }));
-        await flush(100);
+      client.emit('messageCreate', makeMessage({ channelId: 'test-channel', content: `Message ${i}` }));
+      await flush(100);
     }
 
     // Trigger /compact via text command
@@ -131,16 +131,16 @@ test('/compact command triggers compaction and appends compaction entry', async 
     const sessionManager = new DiscordSessionManager({ sessionDir: tempDir });
     const session = sessionManager.getOrCreate('test-channel');
     const branch = session.sessionManager.getBranch();
-    
+
     const compactionEntry = branch.find(e => e.type === 'compaction');
     assert.ok(compactionEntry, 'Session should contain a compaction entry');
     assert.equal(compactionEntry.summary, 'Summary of the conversation');
 
     // Verify buildSessionContext includes the summary
     const context = session.sessionManager.buildSessionContext();
-    const hasSummary = context.messages.some(m => m.role === 'system' && m.content.includes('Summary of the conversation')) || 
-                        context.messages.some(m => m.role === 'user' && m.content.includes('Summary of the conversation'));
-    
+    const hasSummary = context.messages.some(m => m.role === 'system' && m.content.includes('Summary of the conversation')) ||
+      context.messages.some(m => m.role === 'user' && m.content.includes('Summary of the conversation'));
+
     // The exact role and content depends on pi-coding-agent's buildSessionContext implementation
     assert.ok(context.messages.length > 0, 'Context should not be empty');
 
@@ -150,65 +150,65 @@ test('/compact command triggers compaction and appends compaction entry', async 
 });
 
 test('/compact command handles custom instructions', async () => {
-    const client = new MockDiscordClient();
-    const sends = [];
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jevons-compact-instr-test-'));
-  
-    const modelInstance = {
-      id: 'model-test',
-      provider: 'test-provider',
-      api: 'test-api',
-      completeSimple: async (model, options) => {
-        // Find if custom instructions were passed in the messages
-        const hasInstr = options.messages.some(m => m.content && m.content.includes('Focus on the weather'));
-        return { content: [{ type: 'text', text: hasInstr ? 'Weather summary' : 'General summary' }] };
-      }
-    };
-  
-    const mockAuthStorage = {
-      getApiKey: async () => 'test-api-key'
-    };
-  
-    try {
-      createDiscordRuntime({
-        client,
-        token: 'token-123',
-        channelId: 'test-channel',
-        modelInstance,
-        sessionDir: tempDir,
-        authStorage: mockAuthStorage,
-        sendMessage: (payload) => {
-          sends.push(payload);
-          return Promise.resolve();
-        },
-        deps: { Agent: MockAgent }
-      });
-  
-      // Send messages
-      for (let i = 0; i < 10; i++) {
-        client.emit('messageCreate', makeMessage({ channelId: 'test-channel', content: `Message ${i}` }));
-        await flush(100);
-      }
-  
-      // Trigger /compact with instructions
-      client.emit('messageCreate', makeMessage({ channelId: 'test-channel', content: '/compact Focus on the weather' }));
-      await flush(500);
-  
-      // Verify session has compaction entry with summary reflecting instructions
-      const sessionManager = new DiscordSessionManager({ sessionDir: tempDir });
-      const session = sessionManager.getOrCreate('test-channel');
-      const branch = session.sessionManager.getBranch();
-      
-      const compactionEntry = branch.find(e => e.type === 'compaction');
-      assert.ok(compactionEntry, 'Session should contain a compaction entry');
-      // Note: pi-coding-agent's generateSummary is what uses customInstructions.
-      // We are mocking completeSimple which is called by generateSummary (indirectly via model.completeSimple).
-      // If generateSummary passes instructions in the prompt, our mock should see it.
-      
-    } finally {
-      fs.rmSync(tempDir, { recursive: true, force: true });
+  const client = new MockDiscordClient();
+  const sends = [];
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jevons-compact-instr-test-'));
+
+  const modelInstance = {
+    id: 'model-test',
+    provider: 'test-provider',
+    api: 'test-api',
+    completeSimple: async (model, options) => {
+      // Find if custom instructions were passed in the messages
+      const hasInstr = options.messages.some(m => m.content && m.content.includes('Focus on the weather'));
+      return { content: [{ type: 'text', text: hasInstr ? 'Weather summary' : 'General summary' }] };
     }
-  });
+  };
+
+  const mockAuthStorage = {
+    getApiKey: async () => 'test-api-key'
+  };
+
+  try {
+    await createDiscordRuntime({
+      client,
+      token: 'token-123',
+      channelId: 'test-channel',
+      modelInstance,
+      sessionDir: tempDir,
+      authStorage: mockAuthStorage,
+      sendMessage: (payload) => {
+        sends.push(payload);
+        return Promise.resolve();
+      },
+      deps: { Agent: MockAgent }
+    });
+
+    // Send messages
+    for (let i = 0; i < 10; i++) {
+      client.emit('messageCreate', makeMessage({ channelId: 'test-channel', content: `Message ${i}` }));
+      await flush(100);
+    }
+
+    // Trigger /compact with instructions
+    client.emit('messageCreate', makeMessage({ channelId: 'test-channel', content: '/compact Focus on the weather' }));
+    await flush(500);
+
+    // Verify session has compaction entry with summary reflecting instructions
+    const sessionManager = new DiscordSessionManager({ sessionDir: tempDir });
+    const session = sessionManager.getOrCreate('test-channel');
+    const branch = session.sessionManager.getBranch();
+
+    const compactionEntry = branch.find(e => e.type === 'compaction');
+    assert.ok(compactionEntry, 'Session should contain a compaction entry');
+    // Note: pi-coding-agent's generateSummary is what uses customInstructions.
+    // We are mocking completeSimple which is called by generateSummary (indirectly via model.completeSimple).
+    // If generateSummary passes instructions in the prompt, our mock should see it.
+
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
 
 test('/compact command works via slash command interaction', async () => {
   const client = new MockDiscordClient();
@@ -229,7 +229,7 @@ test('/compact command works via slash command interaction', async () => {
   };
 
   try {
-    createDiscordRuntime({
+    await createDiscordRuntime({
       client,
       token: 'token-123',
       channelId: 'test-channel',
@@ -242,8 +242,8 @@ test('/compact command works via slash command interaction', async () => {
 
     // Send messages
     for (let i = 0; i < 10; i++) {
-        client.emit('messageCreate', makeMessage({ channelId: 'test-channel', content: `Message ${i}` }));
-        await flush(100);
+      client.emit('messageCreate', makeMessage({ channelId: 'test-channel', content: `Message ${i}` }));
+      await flush(100);
     }
 
     // Simulate slash command interaction

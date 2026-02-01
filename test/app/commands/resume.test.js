@@ -16,7 +16,7 @@ class MockDiscordClient extends EventEmitter {
       fetch: async (channelId) => {
         return {
           id: channelId,
-          sendTyping: async () => {},
+          sendTyping: async () => { },
           send: async (content) => ({ content, id: 'mock-msg-id' }),
         };
       }
@@ -86,7 +86,7 @@ test('/resume command replies with select menu containing session options', asyn
   };
 
   try {
-    createDiscordRuntime({
+    await createDiscordRuntime({
       client,
       token: 'token-123',
       channelId: 'test-channel',
@@ -157,7 +157,7 @@ test('/resume command shows session preview and relative time', async () => {
   };
 
   try {
-    createDiscordRuntime({
+    await createDiscordRuntime({
       client,
       token: 'token-123',
       channelId: 'test-channel',
@@ -197,11 +197,11 @@ test('/resume command shows session preview and relative time', async () => {
     assert.equal(replies.length, 1, 'Should reply to /resume command');
     const reply = replies[0];
     assert.ok(reply.components, 'Reply should have components');
-    
+
     // Check that the select menu has options with preview and timestamp info
     const row = reply.components[0];
     assert.ok(row, 'Should have a component row');
-    
+
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
@@ -220,7 +220,7 @@ test('Selecting a session switches to that session', async () => {
   };
 
   try {
-    const runtime = createDiscordRuntime({
+    const runtime = await createDiscordRuntime({
       client,
       token: 'token-123',
       channelId: 'test-channel',
@@ -292,7 +292,7 @@ test('Selecting a session switches to that session', async () => {
     // Verify confirmation was sent
     const selectReply = replies.find(r => r.type === 'select');
     assert.ok(selectReply, 'Should reply to select menu interaction');
-    assert.ok(selectReply.content.includes('resumed') || selectReply.content.includes('Resumed') || selectReply.content.includes('continue'), 
+    assert.ok(selectReply.content.includes('resumed') || selectReply.content.includes('Resumed') || selectReply.content.includes('continue'),
       'Reply should confirm session resume');
 
   } finally {
@@ -312,7 +312,7 @@ test('After resume, buildSessionContext returns messages from resumed session', 
   };
 
   try {
-    createDiscordRuntime({
+    await createDiscordRuntime({
       client,
       token: 'token-123',
       channelId: 'test-channel',
@@ -373,7 +373,7 @@ test('/resume with no sessions shows appropriate message', async () => {
   };
 
   try {
-    createDiscordRuntime({
+    await createDiscordRuntime({
       client,
       token: 'token-123',
       channelId: 'test-channel',
@@ -409,7 +409,7 @@ test('/resume with no sessions shows appropriate message', async () => {
 
     // Verify appropriate message for no sessions
     assert.equal(replies.length, 1, 'Should reply to /resume command');
-    assert.ok(replies[0].includes('No previous sessions') || replies[0].includes('no sessions'), 
+    assert.ok(replies[0].includes('No previous sessions') || replies[0].includes('no sessions'),
       'Should inform user when no sessions exist');
 
   } finally {
@@ -430,7 +430,7 @@ test('Resuming current session is handled gracefully', async () => {
   };
 
   try {
-    createDiscordRuntime({
+    await createDiscordRuntime({
       client,
       token: 'token-123',
       channelId: 'test-channel',

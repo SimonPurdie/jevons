@@ -445,7 +445,7 @@ export async function generateReply(payload, modelInstance, options = {}) {
   logAgentInteraction(agent, content, Date.now());
 
   const reply = extractLatestAssistantText(agent.state.messages);
-  
+
   // Persist assistant response to session
   if (options.sessionManager && payload.contextId && reply && reply.trim()) {
     const session = options.sessionManager.getOrCreate(payload.contextId);
@@ -469,7 +469,7 @@ export async function generateReply(payload, modelInstance, options = {}) {
   return reply;
 }
 
-export function createDiscordRuntime(options) {
+export async function createDiscordRuntime(options) {
   const {
     client,
     token,
@@ -544,7 +544,7 @@ export function createDiscordRuntime(options) {
 
   let resolvedModel = modelInstance;
   if (!resolvedModel) {
-    const piAi = _resolvePiAi();
+    const piAi = await _resolvePiAi();
     const getModelFn = getModelOverride || piAi.getModel;
 
     let targetProvider;
@@ -624,7 +624,7 @@ export function createDiscordRuntime(options) {
 
           try {
             const sessions = await sessionManager.listSessions(payload.contextId);
-            
+
             if (sessions.length === 0) {
               await payload.interaction.reply('No previous sessions found for this channel.');
               return;
@@ -642,7 +642,7 @@ export function createDiscordRuntime(options) {
               const truncatedPreview = preview.length > 60 ? preview.slice(0, 60) + '...' : preview;
               const label = `Session ${index + 1}: ${truncatedPreview}`.slice(0, 100);
               const description = `${timeAgo} - ${session.messageCount || 0} messages`.slice(0, 100);
-              
+
               return {
                 label,
                 description,
@@ -701,7 +701,7 @@ export function createDiscordRuntime(options) {
 
             // Switch to the selected session
             sessionManager.switchToSession(payload.contextId, selectedFilePath);
-            
+
             await payload.interaction.reply('Session resumed. Ready to continue.');
           } catch (err) {
             if (typeof onError === 'function') {
@@ -731,14 +731,14 @@ export function createDiscordRuntime(options) {
           try {
             const session = sessionManager.getOrCreate(payload.contextId);
             const branch = session.sessionManager.getBranch();
-            
+
             // Filter for user messages to fork from
-            const userEntries = branch.filter(entry => 
-              entry.type === 'message' && 
-              entry.message && 
+            const userEntries = branch.filter(entry =>
+              entry.type === 'message' &&
+              entry.message &&
               entry.message.role === 'user'
             );
-            
+
             if (userEntries.length === 0) {
               await payload.interaction.reply('No user messages found to fork from.');
               return;
@@ -753,11 +753,11 @@ export function createDiscordRuntime(options) {
                 text = extractTextFromBlocks(text) || 'No text content';
               }
               text = text.replace(/<Current Time:.*?>[\r\n]*/, '').trim();
-              
+
               const truncatedText = text.length > 80 ? text.slice(0, 80) + '...' : text;
               const timestamp = entry.timestamp ? new Date(entry.timestamp) : new Date(msg.timestamp);
               const timeLabel = formatTimeAgo(timestamp);
-              
+
               return {
                 label: `Message ${userEntries.length - index}: ${truncatedText}`.slice(0, 100),
                 description: `Sent ${timeLabel}`.slice(0, 100),
@@ -811,7 +811,7 @@ export function createDiscordRuntime(options) {
 
             // Fork the session
             sessionManager.forkSession(payload.contextId, selectedEntryId);
-            
+
             await payload.interaction.reply('Forked session. You can now continue from that point.');
           } catch (err) {
             if (typeof onError === 'function') {
@@ -840,15 +840,15 @@ export function createDiscordRuntime(options) {
 
           try {
             await payload.interaction.deferReply();
-            
+
             const session = sessionManager.getOrCreate(payload.contextId);
             const customInstructions = payload.interaction.options?.getString('instructions');
-            
+
             // Get API key for the model
             const apiKey = await authStorage.getApiKey(resolvedModel.provider);
-            
+
             const result = await performCompaction(session, resolvedModel, apiKey, customInstructions);
-            
+
             await payload.interaction.editReply(`Compacting session... Summarized messages into summary. Context now reduced.`);
           } catch (err) {
             if (typeof onError === 'function') {
@@ -972,14 +972,14 @@ export function createDiscordRuntime(options) {
           try {
             const session = sessionManager.getOrCreate(payload.contextId);
             const branch = session.sessionManager.getBranch();
-            
+
             // Filter for user messages to fork from
-            const userEntries = branch.filter(entry => 
-              entry.type === 'message' && 
-              entry.message && 
+            const userEntries = branch.filter(entry =>
+              entry.type === 'message' &&
+              entry.message &&
               entry.message.role === 'user'
             );
-            
+
             if (userEntries.length === 0) {
               await sendMessage({
                 content: 'No user messages found to fork from.',
@@ -1001,11 +1001,11 @@ export function createDiscordRuntime(options) {
                 text = extractTextFromBlocks(text) || 'No text content';
               }
               text = text.replace(/<Current Time:.*?>[\r\n]*/, '').trim();
-              
+
               const truncatedText = text.length > 80 ? text.slice(0, 80) + '...' : text;
               const timestamp = entry.timestamp ? new Date(entry.timestamp) : new Date(msg.timestamp);
               const timeLabel = formatTimeAgo(timestamp);
-              
+
               return {
                 label: `Message ${userEntries.length - index}: ${truncatedText}`.slice(0, 100),
                 description: `Sent ${timeLabel}`.slice(0, 100),

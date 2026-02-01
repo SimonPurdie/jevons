@@ -15,7 +15,7 @@ class MockDiscordClient extends EventEmitter {
       fetch: async (channelId) => {
         return {
           id: channelId,
-          sendTyping: async () => {},
+          sendTyping: async () => { },
           send: async (content) => ({ content, id: 'mock-msg-id' }),
         };
       }
@@ -85,7 +85,7 @@ test('/new command creates new session and preserves old session file', async ()
   };
 
   try {
-    createDiscordRuntime({
+    await createDiscordRuntime({
       client,
       token: 'token-123',
       channelId: 'test-channel',
@@ -129,10 +129,10 @@ test('/new command creates new session and preserves old session file', async ()
     // which should be the newly created session with minimal context
     const newSession = sessionManager.getOrCreate('test-channel');
     const newContext = newSession.sessionManager.buildSessionContext();
-    
+
     // The new session context should have fewer messages than the initial
     // The exact count depends on implementation, but it should be less
-    assert.ok(newContext.messages.length <= initialContext.messages.length, 
+    assert.ok(newContext.messages.length <= initialContext.messages.length,
       'New session context should have same or fewer messages than initial');
 
   } finally {
@@ -153,7 +153,7 @@ test('/new command creates multiple distinct sessions', async () => {
   };
 
   try {
-    createDiscordRuntime({
+    await createDiscordRuntime({
       client,
       token: 'token-123',
       channelId: 'test-channel',
@@ -189,7 +189,7 @@ test('/new command creates multiple distinct sessions', async () => {
     // Verify multiple session files exist
     const contextSessionDir = path.join(tempDir, 'test-channel');
     const sessionFiles = fs.readdirSync(contextSessionDir).filter(f => f.endsWith('.jsonl'));
-    
+
     assert.ok(sessionFiles.length >= 2, 'Should create multiple session files after multiple /new commands');
 
   } finally {
@@ -210,7 +210,7 @@ test('/new command works via slash command interaction', async () => {
   };
 
   try {
-    const runtime = createDiscordRuntime({
+    const runtime = await createDiscordRuntime({
       client,
       token: 'token-123',
       channelId: 'test-channel',
@@ -268,7 +268,7 @@ test('/new command creates empty session context', async () => {
   };
 
   try {
-    createDiscordRuntime({
+    await createDiscordRuntime({
       client,
       token: 'token-123',
       channelId: 'test-channel',
@@ -284,10 +284,10 @@ test('/new command creates empty session context', async () => {
     // Send several messages to build up context
     client.emit('messageCreate', makeMessage({ channelId: 'test-channel', content: 'Message 1' }));
     await flush(200);
-    
+
     client.emit('messageCreate', makeMessage({ channelId: 'test-channel', content: 'Message 2' }));
     await flush(200);
-    
+
     client.emit('messageCreate', makeMessage({ channelId: 'test-channel', content: 'Message 3' }));
     await flush(200);
 
@@ -325,7 +325,7 @@ test('/new command old session can be listed', async () => {
   };
 
   try {
-    createDiscordRuntime({
+    await createDiscordRuntime({
       client,
       token: 'token-123',
       channelId: 'test-channel',
@@ -353,9 +353,9 @@ test('/new command old session can be listed', async () => {
 
     // List sessions after /new
     const sessionsAfterNew = await sessionManager.listSessions('test-channel');
-    
+
     // Should have more sessions after /new
-    assert.ok(sessionsAfterNew.length > initialCount || sessionsAfterNew.length >= 1, 
+    assert.ok(sessionsAfterNew.length > initialCount || sessionsAfterNew.length >= 1,
       'Should be able to list sessions including the old one preserved by /new');
 
   } finally {

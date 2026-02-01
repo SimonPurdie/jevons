@@ -26,7 +26,7 @@ test('createDiscordRuntime with activeModel resolves correctly', async () => {
         return { id: 'resolved-model', provider, model };
     };
 
-    const runtime = createDiscordRuntime({
+    const runtime = await createDiscordRuntime({
         client,
         token: 'token',
         channelId: 'channel',
@@ -48,8 +48,8 @@ test('createDiscordRuntime throws error if activeModel not found', async () => {
     ];
     const activeModel = 'missing/model';
 
-    assert.throws(() => {
-        createDiscordRuntime({
+    await assert.rejects(async () => {
+        await createDiscordRuntime({
             client,
             token: 'token',
             channelId: 'channel',
@@ -71,7 +71,7 @@ test('createDiscordRuntime uses authStorage in generateReply (indirectly verifie
         getApiKey: async () => 'key'
     };
 
-    const runtime = createDiscordRuntime({
+    const runtime = await createDiscordRuntime({
         client,
         token: 'token',
         channelId: 'channel',

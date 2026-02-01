@@ -15,7 +15,7 @@ class MockDiscordClient extends EventEmitter {
       fetch: async (channelId) => {
         return {
           id: channelId,
-          sendTyping: async () => {},
+          sendTyping: async () => { },
           send: async (content) => ({ content, id: 'mock-msg-id' }),
         };
       }
@@ -85,7 +85,7 @@ test('/fork command replies with select menu containing user messages', async ()
   };
 
   try {
-    createDiscordRuntime({
+    await createDiscordRuntime({
       client,
       token: 'token-123',
       channelId: 'test-channel',
@@ -149,7 +149,7 @@ test('Selecting a fork point creates a new branched session', async () => {
 
   try {
     const sessionManager = new DiscordSessionManager({ sessionDir: tempDir });
-    const runtime = createDiscordRuntime({
+    const runtime = await createDiscordRuntime({
       client,
       token: 'token-123',
       channelId: 'test-channel',
@@ -214,7 +214,7 @@ test('Selecting a fork point creates a new branched session', async () => {
     // Verify the new active session context only has messages up to the fork point
     const activeSession = sessionManager.getOrCreate('test-channel');
     const branchAfter = activeSession.sessionManager.getBranch();
-    
+
     // It should have the forked user message, but not the second user message
     const activeUserEntries = branchAfter.filter(e => e.type === 'message' && e.message.role === 'user');
     assert.equal(activeUserEntries.length, 1, 'Forked session should only have one user message');
@@ -238,7 +238,7 @@ test('/fork text command also works', async () => {
   };
 
   try {
-    createDiscordRuntime({
+    await createDiscordRuntime({
       client,
       token: 'token-123',
       channelId: 'test-channel',

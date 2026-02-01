@@ -70,7 +70,7 @@ export async function startDiscordRuntime(deps = {}) {
     },
   });
 
-  const runtime = _createDiscordRuntime({
+  const runtime = await _createDiscordRuntime({
     client,
     token: token,
     channelId: discordConfig.channel_id,
