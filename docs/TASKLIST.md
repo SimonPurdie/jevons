@@ -25,8 +25,9 @@
 ---
 
 ## Phase A: Foundation Setup
-- [x] **Step A.1**: Add `pi-coding-agent` dependency
+- [ ] **Step A.1**: Add `pi-coding-agent` dependency
   - **Note**: The package is ESM-only. To proceed, we must migrate the codebase to ESM.
+- [ ] **Step A.1.1**: Migrate codebase to ESM
 - [x] **Step A.2**: Create session directory configuration
   - **Implementation**: Added `sessionDir` field to `config/config.json` (default: `null`)
   - **Implementation**: Created `app/session.js` module with directory resolution logic
