@@ -45,7 +45,12 @@
   - **Note**: All auth tests pass (171/175 total tests pass; 4 pre-existing async failures unrelated)
 
 ## Phase B: SessionManager Integration
-- [ ] **Step B.1**: Create `SessionManager` wrapper
+- [x] **Step B.1**: Create `SessionManager` wrapper
+  - **Implementation**: Created `app/sessionManager.js` with `DiscordSessionManager` class
+  - **Features**: Maps Discord `contextId` to sessions, CRUD operations, session persistence
+  - **Methods**: `getOrCreate()`, `newSession()`, `listSessions()`, `switchToSession()`, `getActiveSession()`, `hasActiveSession()`, `endSession()`, `getActiveContextIds()`, `clearAllSessions()`
+  - **Tests**: Created `test/app/sessionManager.test.js` with 42 passing tests
+  - **Test Coverage**: Constructor validation, getOrCreate deduplication, session lifecycle, persistence, context operations
 - [ ] **Step B.2**: Migrate Agent creation to use `SessionManager`
 - [ ] **Step B.3**: Implement session persistence and recovery
 
