@@ -36,9 +36,9 @@ export async function startDiscordRuntime(deps = {}) {
   const discordConfig = config.discord || {};
   const remindersConfig = config.reminders || {};
 
-  const token = process.env.JEVONS_DISCORD_TOKEN || discordConfig.token;
+  const token = await authStorage.getApiKey('discord') || process.env.JEVONS_DISCORD_TOKEN || discordConfig.token;
   if (!token) {
-    throw new Error('Discord token missing in config (set JEVONS_DISCORD_TOKEN env var)');
+    throw new Error('Discord token missing in config (set in auth.json or JEVONS_DISCORD_TOKEN env var)');
   }
   if (!discordConfig.channel_id) {
     throw new Error('Discord channel_id missing in config');

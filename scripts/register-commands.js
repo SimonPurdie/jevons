@@ -1,14 +1,16 @@
 import { REST, Routes, SlashCommandBuilder } from 'discord.js';
 import { loadConfig } from '../app/config.js';
+import { AuthStorage } from '../app/auth.js';
 import path from 'path';
 
 async function registerCommands() {
     const config = loadConfig();
     const discordConfig = config.discord || {};
+    const authStorage = new AuthStorage();
 
-    const token = process.env.JEVONS_DISCORD_TOKEN || discordConfig.token;
+    const token = await authStorage.getApiKey('discord') || process.env.JEVONS_DISCORD_TOKEN || discordConfig.token;
     if (!token || !discordConfig.application_id) {
-        console.error('Error: "token" (or JEVONS_DISCORD_TOKEN env var) and "application_id" are required in config.json under "discord".');
+        console.error('Error: Discord token (in auth.json or JEVONS_DISCORD_TOKEN env var) and "application_id" are required.');
         process.exit(1);
     }
 
@@ -31,7 +33,7 @@ async function registerCommands() {
             .setDescription('Branch conversation from an earlier message'),
     ].map(command => command.toJSON());
 
-    const rest = new REST({ version: '10' }).setToken(discordConfig.token);
+    const rest = new REST({ version: '10' }).setToken(token);
 
     try {
         console.log(`Started refreshing ${commands.length} application (/) commands.`);

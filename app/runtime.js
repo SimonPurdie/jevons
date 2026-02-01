@@ -1053,6 +1053,12 @@ export async function createDiscordRuntime(options) {
         const extraEnv = {
           JEVONS_IPC_PORT: String(ipcPort),
         };
+
+        if (authStorage) {
+          const braveKey = await authStorage.getApiKey('brave');
+          if (braveKey) extraEnv.BRAVE_API_KEY = braveKey;
+        }
+
         if (payload.channelId && payload.channelId !== 'null') {
           extraEnv.JEVONS_CHANNEL_ID = payload.channelId;
         }
