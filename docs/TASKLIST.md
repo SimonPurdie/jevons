@@ -26,8 +26,12 @@
 
 ## Phase A: Foundation Setup
 - [x] **Step A.1**: Add `pi-coding-agent` dependency
-  - **Note**: The package is ESM-only. Use dynamic `import()` for all imports. See BREADCRUMBS.md for details.
-- [ ] **Step A.2**: Create session directory configuration
+  - **Note**: The package is ESM-only. To proceed, we must migrate the codebase to ESM.
+- [x] **Step A.2**: Create session directory configuration
+  - **Implementation**: Added `sessionDir` field to `config/config.json` (default: `null`)
+  - **Implementation**: Created `app/session.js` module with directory resolution logic
+  - **Tests**: Created `test/app/session.test.js` with 15 passing tests
+  - **Note**: Users must manually add `"sessionDir": null` to their `config/config.json` since it's gitignored
 - [ ] **Step A.3**: Switch to `pi-coding-agent`'s `AuthStorage`
 
 ## Phase B: SessionManager Integration
