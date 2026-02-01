@@ -99,6 +99,11 @@ function createDiscordBot(options) {
     if (!message || !message.channel) {
       return;
     }
+    // Only respond to Default (0), Reply (19), and ThreadStarterMessage (21)
+    const allowedTypes = [0, 19, 21];
+    if (!allowedTypes.includes(message.type)) {
+      return;
+    }
     if (message.author && message.author.bot) {
       return;
     }

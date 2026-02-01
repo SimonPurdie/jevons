@@ -23,11 +23,15 @@ function makeMessage({
   authorId = 'user-1',
   bot = false,
   messageId = 'msg-1',
+  system = false,
+  type = 0,
 } = {}) {
   return {
     id: messageId,
     content,
     author: { id: authorId, bot },
+    system: Boolean(system),
+    type: type || 0,
     channel: {
       id: channelId,
       isThread,
@@ -76,7 +80,7 @@ test('createDiscordBot start calls login with token', async () => {
     client,
     token: 'token-123',
     channelId: 'root',
-    onMessage: () => {},
+    onMessage: () => { },
   });
   const result = await bot.start();
   assert.equal(result, 'ok');
@@ -109,4 +113,36 @@ test('createDiscordBot filters messages and handles threads', () => {
   assert.equal(received.length, 2);
   assert.equal(received[0].contextId, 'root');
   assert.equal(received[1].contextId, 'thread-1');
+});
+
+test('createDiscordBot only allows whitelisted message types', () => {
+  const client = new MockDiscordClient();
+  const received = [];
+  createDiscordBot({
+    client,
+    token: 'token-123',
+    channelId: 'root',
+    onMessage: (payload) => received.push(payload),
+  });
+
+  // Whitelisted Types
+  client.emit('messageCreate', makeMessage({ channelId: 'root', type: 0, content: 'default' }));
+  client.emit('messageCreate', makeMessage({ channelId: 'root', type: 19, content: 'reply' }));
+  client.emit('messageCreate', makeMessage({
+    channelId: 'thread-1',
+    parentId: 'root',
+    isThread: true,
+    type: 21,
+    content: 'starter'
+  }));
+
+  // Non-whitelisted Types
+  client.emit('messageCreate', makeMessage({ channelId: 'root', type: 18 })); // ThreadCreated
+  client.emit('messageCreate', makeMessage({ channelId: 'root', type: 6 }));  // Pin
+  client.emit('messageCreate', makeMessage({ channelId: 'root', type: 1 }));  // RecipientAdd
+
+  assert.equal(received.length, 3);
+  assert.equal(received[0].content, 'default');
+  assert.equal(received[1].content, 'reply');
+  assert.equal(received[2].content, 'starter');
 });
