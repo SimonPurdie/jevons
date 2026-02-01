@@ -12,6 +12,26 @@
     {
       "provider": "openai-codex",
       "model": "gpt-5.1-codex-mini"
+    },
+    {
+      "provider": "opencode",
+      "model": "glm-4.7-free"
+    },
+    {
+      "provider": "opencode",
+      "model": "kimi-k2.5-free"
+    },
+    {
+      "provider": "opencode",
+      "model": "minimax-m2.1-free"
+    },
+    {
+      "provider": "opencode",
+      "model": "big-pickle"
+    },
+    {
+      "provider": "opencode",
+      "model": "gpt-5-nano"
     }
   ],
   "reminders": {

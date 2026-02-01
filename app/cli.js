@@ -128,6 +128,7 @@ async function configureModels(rl, config) {
 }
 
 const SUPPORTED_PROVIDERS = [
+    { id: 'opencode', name: 'Opencode (API Key)', oauth: false },
     { id: 'google', name: 'Google (API Key)', oauth: false },
     { id: 'anthropic', name: 'Anthropic (API Key)', oauth: false },
     { id: 'openai', name: 'OpenAI (API Key)', oauth: false },
