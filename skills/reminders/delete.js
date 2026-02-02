@@ -1,14 +1,16 @@
 #!/usr/bin/env node
-const fs = require('fs');
-const path = require('path');
-const { loadConfig } = require('../../app/config');
-const { sendIpcMessage } = require('../../lib/ipc-client');
-const { parseReminderLine } = require('../../scheduler/parser');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { loadConfig } from '../../app/config.js';
+import { sendIpcMessage } from '../../lib/ipc-client.js';
+import { parseReminderLine } from '../../scheduler/parser.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const config = loadConfig({ cwd: path.join(__dirname, '../../') });
 const filePath = config.reminders?.file_path;
-
-const [,, id] = process.argv;
+const [, , id] = process.argv;
 
 if (!filePath) {
   console.error('Error: reminders.file_path not found in config.');
@@ -30,7 +32,7 @@ async function run() {
     const content = fs.readFileSync(filePath, 'utf8');
     const lines = content.split('\n');
     let found = false;
-    
+
     const updatedLines = lines.filter(line => {
       const reminder = parseReminderLine(line);
       if (reminder && reminder.id === id) {
@@ -46,12 +48,10 @@ async function run() {
     }
 
     fs.writeFileSync(filePath, updatedLines.join('\n'), 'utf8');
-    
+
     const confirmation = `Deleted reminder: ${id}`;
 
-    // Try to send via IPC
     const sent = await sendIpcMessage(confirmation);
-    
     if (sent) {
       process.stdout.write(`SUCCESS: Message sent to Discord: ${confirmation}\n`);
     } else {

@@ -1,21 +1,22 @@
 #!/usr/bin/env node
-const fs = require('fs');
-const path = require('path');
-const { 
-  generateReminderId, 
-  formatReminderLine, 
-  DATE_PATTERN, 
-  TIME_PATTERN, 
-  VALID_RECURRENCE 
-} = require('../../scheduler/parser');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import {
+  generateReminderId,
+  formatReminderLine,
+  DATE_PATTERN,
+  TIME_PATTERN,
+  VALID_RECURRENCE,
+} from '../../scheduler/parser.js';
+import { loadConfig } from '../../app/config.js';
+import { sendIpcMessage } from '../../lib/ipc-client.js';
 
-const { loadConfig } = require('../../app/config');
-const { sendIpcMessage } = require('../../lib/ipc-client');
-
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const config = loadConfig({ cwd: path.join(__dirname, '../../') });
 const filePath = config.reminders?.file_path;
-
-const [,, date, time, recur, msg] = process.argv;
+const [, , date, time, recur, msg] = process.argv;
 
 if (!filePath) {
   console.error('Error: reminders.file_path not found in config.');
@@ -27,7 +28,6 @@ if (!date || !time || !recur || msg === undefined) {
   process.exit(1);
 }
 
-// Validation
 if (!DATE_PATTERN.test(date)) {
   console.error(`Error: Invalid date format: ${date}. Use YYYY-MM-DD`);
   process.exit(1);
@@ -44,6 +44,7 @@ if (!TIME_PATTERN.test(time)) {
   console.error(`Error: Invalid time format: ${time}. Use HH:MM`);
   process.exit(1);
 }
+
 if (!VALID_RECURRENCE.includes(recur)) {
   console.error(`Error: Invalid recurrence: ${recur}. Use ${VALID_RECURRENCE.join(', ')}`);
   process.exit(1);
@@ -54,26 +55,24 @@ const line = formatReminderLine({ date, time, recur, msg, id });
 
 async function run() {
   try {
-    // Read existing content to ensure we add a newline if needed
     let existing = '';
     if (fs.existsSync(filePath)) {
       existing = fs.readFileSync(filePath, 'utf8');
     }
-    
-    const separator = (existing && !existing.endsWith('\n')) ? '\n' : '';
+
+    const separator = existing && !existing.endsWith('\n') ? '\n' : '';
     fs.appendFileSync(filePath, separator + line + '\n');
-    
+
     const recurPart = recur !== 'none' ? ` (recurring: ${recur})` : '';
     const confirmation = `Set reminder: ${msg} at ${time} on ${date}${recurPart}`;
-    
-    // Try to send via IPC
+
     const sent = await sendIpcMessage(confirmation);
-    
     if (sent) {
       process.stdout.write(`SUCCESS: Message sent to Discord: ${confirmation}\n`);
     } else {
       process.stdout.write(`${confirmation}\n`);
     }
+
     process.stderr.write(`ID: ${id}\n`);
   } catch (err) {
     console.error(`Error writing to file: ${err.message}`);
@@ -82,4 +81,3 @@ async function run() {
 }
 
 run();
-

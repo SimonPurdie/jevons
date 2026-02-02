@@ -1,9 +1,12 @@
 #!/usr/bin/env node
-const fs = require('fs');
-const path = require('path');
-const { loadConfig } = require('../../app/config');
-const { parseRemindersFile } = require('../../scheduler/parser');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { loadConfig } from '../../app/config.js';
+import { parseRemindersFile } from '../../scheduler/parser.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const config = loadConfig({ cwd: path.join(__dirname, '../../') });
 const filePath = config.reminders?.file_path;
 
