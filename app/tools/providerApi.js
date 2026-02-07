@@ -31,7 +31,7 @@ export function createProviderApiTool(options = {}) {
     name: 'provider_api',
     label: 'provider_api',
     description:
-      'Call allowlisted provider APIs using project auth. Use this for provider operations such as text/image generation, uploads, and downloads.',
+      'Call allowlisted provider APIs using project auth. Use action "request" with params.url/method/body. Binary responses and JSON inlineData image payloads are converted into file artifacts.',
     parameters: providerApiSchema,
     execute: async (_toolCallId, params, signal) => {
       const provider = typeof params?.provider === 'string' ? params.provider.trim() : '';
@@ -126,6 +126,41 @@ export function createProviderApiTool(options = {}) {
         }
 
         const bodyResult = await parseNonBinaryResponse(response, responseType);
+        const inlineArtifacts = extractInlineArtifactsFromData(bodyResult.data, {
+          provider,
+          filenameHint,
+          outputHint: params?.outputHint,
+        });
+        if (inlineArtifacts.length > 0) {
+          for (const artifact of inlineArtifacts) {
+            if (typeof onArtifact === 'function') {
+              onArtifact(artifact);
+            }
+          }
+          const artifactDetails = inlineArtifacts.map((artifact) => ({
+            kind: artifact.kind,
+            name: artifact.name,
+            contentType: artifact.contentType,
+            size: artifact.size,
+          }));
+          return {
+            content: [{
+              type: 'text',
+              text: `Provider request completed (${status}). Extracted ${inlineArtifacts.length} inline artifact(s).`,
+            }],
+            details: {
+              ok: response.ok,
+              provider,
+              service,
+              action,
+              status,
+              contentType,
+              artifacts: artifactDetails,
+              data: bodyResult.data,
+            },
+          };
+        }
+
         const preview = previewText(bodyResult.preview);
         return {
           content: [{
@@ -354,4 +389,82 @@ function stageTempArtifact(buffer, filename) {
   const filePath = path.join(root, `${Date.now()}-${crypto.randomBytes(4).toString('hex')}-${safeName}`);
   fs.writeFileSync(filePath, buffer);
   return filePath;
+}
+
+function extractInlineArtifactsFromData(data, options = {}) {
+  if (!data || typeof data !== 'object') {
+    return [];
+  }
+  const provider = typeof options.provider === 'string' && options.provider.trim() ? options.provider.trim() : 'provider';
+  const outputHint = typeof options.outputHint === 'string' ? options.outputHint.trim().toLowerCase() : '';
+  const artifacts = [];
+  const seen = new Set();
+  const blocks = [];
+  collectInlineBlocks(data, blocks);
+
+  for (const block of blocks) {
+    const mimeType = normalizeMimeType(
+      block.mimeType || block.mime_type || outputHint || 'application/octet-stream'
+    );
+    const base64 = typeof block.data === 'string' ? block.data.trim() : '';
+    if (!base64) {
+      continue;
+    }
+    const dedupeKey = `${mimeType}:${base64.slice(0, 64)}`;
+    if (seen.has(dedupeKey)) {
+      continue;
+    }
+    seen.add(dedupeKey);
+
+    let buffer;
+    try {
+      buffer = Buffer.from(base64, 'base64');
+    } catch (_err) {
+      continue;
+    }
+    if (!buffer || buffer.byteLength === 0) {
+      continue;
+    }
+
+    const filename = options.filenameHint || defaultFilename(provider, mimeType);
+    const stagedPath = stageTempArtifact(buffer, filename);
+    artifacts.push({
+      kind: 'file',
+      name: path.basename(filename),
+      contentType: mimeType,
+      size: buffer.byteLength,
+      attachment: stagedPath,
+    });
+  }
+
+  return artifacts;
+}
+
+function collectInlineBlocks(node, output) {
+  if (!node || typeof node !== 'object') {
+    return;
+  }
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      collectInlineBlocks(item, output);
+    }
+    return;
+  }
+
+  if (node.inlineData && typeof node.inlineData === 'object') {
+    output.push(node.inlineData);
+  }
+  if (node.inline_data && typeof node.inline_data === 'object') {
+    output.push(node.inline_data);
+  }
+
+  for (const value of Object.values(node)) {
+    if (value && typeof value === 'object') {
+      collectInlineBlocks(value, output);
+    }
+  }
+}
+
+function normalizeMimeType(value) {
+  return typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : 'application/octet-stream';
 }

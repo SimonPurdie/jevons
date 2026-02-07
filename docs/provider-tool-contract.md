@@ -54,6 +54,11 @@ Runtime artifact objects (captured from tools, then consumed by Discord dispatch
   - `attachment`: `Buffer` or local file path
   - `url`: remote URL (optional future path)
 
+`provider_api` produces artifacts from:
+
+- Raw binary HTTP responses (for example `Content-Type: image/png`)
+- JSON responses containing inline payload blocks (`inlineData` or `inline_data`) with base64 `data` and image MIME type
+
 ## Error Codes
 
 Tool-level policy/validation failures should emit structured codes in `details.code`:
@@ -75,3 +80,14 @@ Dispatcher-level delivery failures should include:
 - Discord dispatcher attempts up to 10 files per message.
 - Default max file size is 8 MB unless runtime overrides `maxAttachmentBytes`.
 - Rejected files are summarized in fallback text appended to message content.
+
+## Agent Playbook (Provider API)
+
+- Use `action: "request"` with:
+  - `params.url` (required)
+  - `params.method` (optional, defaults to `GET`)
+  - `params.body` for JSON payloads
+  - `params.responseType: "json"` when expecting Gemini-style JSON with `inlineData`
+- For image generation:
+  - Use an image-capable model/endpoint.
+  - If response contains no actual image bytes (`inlineData` or binary body), report capability mismatch instead of fabricating output.

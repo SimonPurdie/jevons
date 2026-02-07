@@ -87,3 +87,62 @@ test('provider_api captures binary response as artifact', async () => {
     globalThis.fetch = originalFetch;
   }
 });
+
+test('provider_api extracts inlineData image artifacts from JSON response', async () => {
+  const originalFetch = globalThis.fetch;
+  const artifacts = [];
+  globalThis.fetch = async () => {
+    return new Response(
+      JSON.stringify({
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  inlineData: {
+                    mimeType: 'image/png',
+                    data: Buffer.from('png-bytes').toString('base64'),
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      }),
+      {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }
+    );
+  };
+
+  try {
+    const tool = createProviderApiTool({
+      authStorage: { getApiKey: async () => 'secret-key' },
+      allowedProviders: ['google'],
+      onArtifact: (artifact) => artifacts.push(artifact),
+    });
+    const result = await tool.execute('call-4', {
+      provider: 'google',
+      action: 'request',
+      params: {
+        url: 'https://example.com/v1/generate',
+        responseType: 'json',
+      },
+    });
+
+    assert.equal(result.details.ok, true);
+    assert.ok(Array.isArray(result.details.artifacts));
+    assert.equal(result.details.artifacts.length, 1);
+    assert.equal(artifacts.length, 1);
+    assert.equal(artifacts[0].contentType, 'image/png');
+    assert.ok(fs.existsSync(artifacts[0].attachment), 'Staged inlineData artifact should exist');
+  } finally {
+    for (const artifact of artifacts) {
+      if (artifact && artifact.attachment && typeof artifact.attachment === 'string' && fs.existsSync(artifact.attachment)) {
+        fs.unlinkSync(artifact.attachment);
+      }
+    }
+    globalThis.fetch = originalFetch;
+  }
+});

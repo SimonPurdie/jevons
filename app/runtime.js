@@ -167,6 +167,14 @@ function buildSystemPrompt(skills, workspaceFilesContent) {
     sections.push(`${header}\n${workspaceFilesContent}`);
   }
 
+  sections.push(
+    'Provider tool guidance:\n' +
+    '- For image generation, use image-capable models/endpoints only.\n' +
+    '- Call `provider_api` with `action: "request"` and explicit `params.url`.\n' +
+    '- Prefer `params.responseType: "json"` for Gemini-style JSON responses with `inlineData` image parts.\n' +
+    '- If the API response has no real image bytes, do not fabricate output; explain capability mismatch and ask user to enable an image-capable endpoint.'
+  );
+
   return sections.join('\n\n');
 }
 
