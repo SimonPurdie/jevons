@@ -62,6 +62,8 @@ export function isReminderDue(reminder, nowUtc, lastRunUtc = null) {
     return false;
   }
 
+  reminder._targetDateStr = targetDateStr;
+
   // 2. Convert Target Local Time (London) to UTC Timestamp(s)
   const dueTimestamp = localToUtc(targetDateStr, time);
 
