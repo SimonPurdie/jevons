@@ -1,6 +1,9 @@
 import test from 'node:test';
 import { strict as assert } from 'node:assert';
 import { EventEmitter } from 'events';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import { createDiscordBot, extractContext, splitMessage, sendDiscordMessage } from '../../app/discord.js';
 
 class MockDiscordClient extends EventEmitter {
@@ -239,4 +242,67 @@ test('sendDiscordMessage skips oversized attachments and appends fallback note',
   assert.equal(typeof sentMessages[0], 'string');
   assert.ok(sentMessages[0].includes('Attempting attachment'));
   assert.ok(sentMessages[0].includes('Attachment skipped'));
+});
+
+test('sendDiscordMessage falls back to text when rich payload send fails', async () => {
+  const sentMessages = [];
+  const mockChannel = {
+    send: (msg) => {
+      if (msg && typeof msg === 'object' && Array.isArray(msg.files) && msg.files.length > 0) {
+        return Promise.reject(new Error('Missing Permissions'));
+      }
+      sentMessages.push(msg);
+      return Promise.resolve({ id: 'msg-' + sentMessages.length });
+    },
+  };
+  const mockClient = {
+    channels: {
+      fetch: () => Promise.resolve(mockChannel),
+    },
+  };
+
+  await sendDiscordMessage(mockClient, {
+    content: 'Image response',
+    files: [{ attachment: Buffer.from('abc'), name: 'image.png' }],
+    channelId: 'root',
+  });
+
+  assert.equal(sentMessages.length, 1);
+  assert.equal(typeof sentMessages[0], 'string');
+  assert.ok(sentMessages[0].includes('Image response'));
+  assert.ok(sentMessages[0].includes('Attachment upload failed'));
+});
+
+test('sendDiscordMessage resolves file path attachments to Buffer payloads', async () => {
+  const sentMessages = [];
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jevons-discord-test-'));
+  const filePath = path.join(tempDir, 'artifact.png');
+  fs.writeFileSync(filePath, Buffer.from('fake-image-bytes'));
+
+  const mockChannel = {
+    send: (msg) => {
+      sentMessages.push(msg);
+      return Promise.resolve({ id: 'msg-' + sentMessages.length });
+    },
+  };
+  const mockClient = {
+    channels: {
+      fetch: () => Promise.resolve(mockChannel),
+    },
+  };
+
+  try {
+    await sendDiscordMessage(mockClient, {
+      content: 'Path attachment',
+      files: [{ attachment: filePath, name: 'artifact.png' }],
+      channelId: 'root',
+    });
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+
+  assert.equal(sentMessages.length, 1);
+  assert.equal(typeof sentMessages[0], 'object');
+  assert.ok(Buffer.isBuffer(sentMessages[0].files[0].attachment));
+  assert.equal(sentMessages[0].files[0].name, 'artifact.png');
 });

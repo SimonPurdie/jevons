@@ -75,6 +75,10 @@ test('provider_api captures binary response as artifact', async () => {
     });
 
     assert.equal(result.details.ok, true);
+    assert.ok(Array.isArray(result.details.artifacts));
+    assert.equal(result.details.artifacts[0].storage.kind, 'temp_file');
+    assert.equal(result.details.artifacts[0].storage.ephemeral, true);
+    assert.ok(typeof result.details.artifacts[0].storage.path === 'string');
     assert.equal(artifacts.length, 1);
     assert.equal(artifacts[0].kind, 'file');
     assert.ok(fs.existsSync(artifacts[0].attachment), 'Staged artifact file should exist');
@@ -134,6 +138,9 @@ test('provider_api extracts inlineData image artifacts from JSON response', asyn
     assert.equal(result.details.ok, true);
     assert.ok(Array.isArray(result.details.artifacts));
     assert.equal(result.details.artifacts.length, 1);
+    assert.equal(result.details.artifacts[0].storage.kind, 'temp_file');
+    assert.equal(result.details.artifacts[0].storage.ephemeral, true);
+    assert.ok(typeof result.details.artifacts[0].storage.path === 'string');
     assert.equal(artifacts.length, 1);
     assert.equal(artifacts[0].contentType, 'image/png');
     assert.ok(fs.existsSync(artifacts[0].attachment), 'Staged inlineData artifact should exist');

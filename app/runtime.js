@@ -5,6 +5,7 @@ import { performCompaction } from './compaction.js';
 import { loadSkill } from '../skills/loader.js';
 import { createBashTool } from './tools/bash.js';
 import { createProviderApiTool } from './tools/providerApi.js';
+import { createDiscordSendTool } from './tools/discordSend.js';
 import { readConfigFile, saveConfig } from './config.js';
 import fs from 'fs';
 import path from 'path';
@@ -1261,6 +1262,18 @@ export async function createDiscordRuntime(options) {
         }
 
         const runtimeTools = [createBashTool(process.cwd(), extraEnv)];
+        runtimeTools.push(
+          createDiscordSendTool({
+            sendMessage,
+            context: {
+              channelId: payload.channelId,
+              threadId: payload.threadId,
+              contextId: payload.contextId,
+              messageId: payload.messageId,
+              authorId: payload.authorId,
+            },
+          })
+        );
         if (authStorage) {
           runtimeTools.push(createProviderApiTool({
             authStorage,

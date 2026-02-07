@@ -35,7 +35,12 @@ Canonical shape:
         "kind": "file",
         "name": "generated.png",
         "contentType": "image/png",
-        "size": 123456
+        "size": 123456,
+        "storage": {
+          "kind": "temp_file",
+          "path": "/tmp/jevons-artifacts/1770478733796-...-generated.png",
+          "ephemeral": true
+        }
       }
     ]
   }
@@ -50,6 +55,10 @@ Runtime artifact objects (captured from tools, then consumed by Discord dispatch
 - `name`: filename for Discord
 - `contentType`: MIME type if known
 - `size`: size estimate in bytes if known
+- `storage` (details output): where the artifact currently lives for this runtime
+  - `kind`: currently `temp_file`
+  - `path`: absolute temp file path
+  - `ephemeral`: `true` for temp staged outputs
 - One of:
   - `attachment`: `Buffer` or local file path
   - `url`: remote URL (optional future path)
@@ -80,6 +89,7 @@ Dispatcher-level delivery failures should include:
 - Discord dispatcher attempts up to 10 files per message.
 - Default max file size is 8 MB unless runtime overrides `maxAttachmentBytes`.
 - Rejected files are summarized in fallback text appended to message content.
+- Provider artifacts are temp-staged under `/tmp/jevons-artifacts` and are ephemeral; they may be removed between runs/restarts.
 
 ## Agent Playbook (Provider API)
 

@@ -239,11 +239,30 @@ export function sendDiscordMessage(client, payload) {
       if (Array.isArray(components) && components.length > 0) {
         messagePayload.components = components;
       }
-      results.push(await channel.send(messagePayload));
-      for (const chunk of chunks.slice(1)) {
-        results.push(await channel.send(chunk));
+      try {
+        results.push(await channel.send(messagePayload));
+        for (const chunk of chunks.slice(1)) {
+          results.push(await channel.send(chunk));
+        }
+        return results.length === 1 ? results[0] : results;
+      } catch (err) {
+        const failedFiles = acceptedFiles.map((file) => file.name).join(', ');
+        // eslint-disable-next-line no-console
+        console.error('[Discord] Failed to send rich payload', {
+          targetId,
+          error: err && err.message ? err.message : String(err),
+          files: failedFiles,
+        });
+
+        const failureNotice = acceptedFiles.length > 0
+          ? `Attachment upload failed: ${err && err.message ? err.message : 'unknown error'}.`
+          : `Rich payload send failed: ${err && err.message ? err.message : 'unknown error'}.`;
+        const fallbackContent = [firstChunk, failureNotice].filter(Boolean).join('\n\n').trim() || failureNotice;
+        for (const chunk of splitMessage(fallbackContent)) {
+          results.push(await channel.send(chunk));
+        }
+        return results.length === 1 ? results[0] : results;
       }
-      return results.length === 1 ? results[0] : results;
     }
 
     if (chunks.length === 0) {
@@ -313,7 +332,12 @@ function normalizeDiscordFiles(files, maxAttachmentBytes) {
     }
 
     const name = typeof file.name === 'string' && file.name.trim() ? file.name : `attachment-${acceptedFiles.length + 1}.bin`;
-    const size = estimateAttachmentSize(file.attachment);
+    const resolved = resolveAttachment(file.attachment);
+    if (!resolved.ok) {
+      fallbackNotes.push(`Attachment skipped: "${name}" ${resolved.reason}.`);
+      continue;
+    }
+    const size = resolved.size;
 
     if (size !== null && size > maxAttachmentBytes) {
       fallbackNotes.push(
@@ -322,13 +346,8 @@ function normalizeDiscordFiles(files, maxAttachmentBytes) {
       continue;
     }
 
-    if (file.attachment === undefined || file.attachment === null) {
-      fallbackNotes.push(`Attachment skipped: "${name}" has no attachment data.`);
-      continue;
-    }
-
     acceptedFiles.push({
-      attachment: file.attachment,
+      attachment: resolved.attachment,
       name,
     });
   }
@@ -351,6 +370,27 @@ function estimateAttachmentSize(attachment) {
     return null;
   }
   return null;
+}
+
+function resolveAttachment(attachment) {
+  if (attachment === undefined || attachment === null) {
+    return { ok: false, reason: 'has no attachment data' };
+  }
+  if (Buffer.isBuffer(attachment)) {
+    return { ok: true, attachment, size: attachment.byteLength };
+  }
+  if (typeof attachment === 'string') {
+    try {
+      if (!fs.existsSync(attachment)) {
+        return { ok: false, reason: 'file path does not exist' };
+      }
+      const fileBuffer = fs.readFileSync(attachment);
+      return { ok: true, attachment: fileBuffer, size: fileBuffer.byteLength };
+    } catch (_err) {
+      return { ok: false, reason: 'file path could not be read' };
+    }
+  }
+  return { ok: false, reason: 'uses unsupported attachment type' };
 }
 
 export { extractContext, splitMessage };

@@ -115,12 +115,7 @@ export function createProviderApiTool(options = {}) {
               action,
               status,
               contentType: artifact.contentType,
-              artifacts: [{
-                kind: artifact.kind,
-                name: artifact.name,
-                contentType: artifact.contentType,
-                size: artifact.size,
-              }],
+              artifacts: [toArtifactDetails(artifact)],
             },
           };
         }
@@ -137,12 +132,7 @@ export function createProviderApiTool(options = {}) {
               onArtifact(artifact);
             }
           }
-          const artifactDetails = inlineArtifacts.map((artifact) => ({
-            kind: artifact.kind,
-            name: artifact.name,
-            contentType: artifact.contentType,
-            size: artifact.size,
-          }));
+          const artifactDetails = inlineArtifacts.map((artifact) => toArtifactDetails(artifact));
           return {
             content: [{
               type: 'text',
@@ -467,4 +457,21 @@ function collectInlineBlocks(node, output) {
 
 function normalizeMimeType(value) {
   return typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : 'application/octet-stream';
+}
+
+function toArtifactDetails(artifact) {
+  const details = {
+    kind: artifact.kind,
+    name: artifact.name,
+    contentType: artifact.contentType,
+    size: artifact.size,
+  };
+  if (typeof artifact.attachment === 'string' && artifact.attachment) {
+    details.storage = {
+      kind: 'temp_file',
+      path: artifact.attachment,
+      ephemeral: true,
+    };
+  }
+  return details;
 }
