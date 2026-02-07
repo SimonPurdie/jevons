@@ -4,6 +4,7 @@ import { DiscordSessionManager } from './sessionManager.js';
 import { performCompaction } from './compaction.js';
 import { loadSkill } from '../skills/loader.js';
 import { createBashTool } from './tools/bash.js';
+import { createProviderApiTool } from './tools/providerApi.js';
 import { readConfigFile, saveConfig } from './config.js';
 import fs from 'fs';
 import path from 'path';
@@ -158,7 +159,7 @@ function buildSystemPrompt(skills, workspaceFilesContent) {
 
   if (skills && skills.length > 0) {
     const skillsContent = skills.map((skill) => skill.content).join('\n\n');
-    sections.push(`You have access to the following skills:\n\n${skillsContent}\n\nUse the bash tool to execute these skills when needed.`);
+    sections.push(`You have access to the following skills:\n\n${skillsContent}\n\nUse the available tools to execute these skills when needed.`);
   }
 
   if (workspaceFilesContent) {
@@ -413,13 +414,19 @@ export async function generateReply(payload, modelInstance, options = {}) {
   const latestMessage = agent.state.messages[agent.state.messages.length - 1];
 
   if (!latestMessage || latestMessage.role !== 'assistant') {
-    return '...';
+    return {
+      content: '...',
+      files: collectReplyFiles(options.artifacts),
+    };
   }
 
   // Handle API Errors directly from the message record
   if (latestMessage.stopReason === 'error' || latestMessage.errorMessage) {
     const errorMsg = latestMessage.errorMessage || 'API error: request failed';
-    return `API error: ${errorMsg}`;
+    return {
+      content: `API error: ${errorMsg}`,
+      files: collectReplyFiles(options.artifacts),
+    };
   }
 
   const reply = getTextFromBlocks(latestMessage.content);
@@ -437,11 +444,41 @@ export async function generateReply(payload, modelInstance, options = {}) {
   if (!reply || !reply.trim()) {
     const hasToolCalls = Array.isArray(latestMessage.content) && latestMessage.content.some(c => c.type === 'tool_call');
     if (hasToolCalls) {
-      return 'Action completed.';
+      const files = collectReplyFiles(options.artifacts);
+      return {
+        content: files.length > 0 ? `Action completed. Attached ${files.length} file(s).` : 'Action completed.',
+        files,
+      };
     }
-    return '...';
+    return {
+      content: '...',
+      files: collectReplyFiles(options.artifacts),
+    };
   }
-  return reply;
+  return {
+    content: reply,
+    files: collectReplyFiles(options.artifacts),
+  };
+}
+
+function collectReplyFiles(artifacts) {
+  if (!Array.isArray(artifacts)) {
+    return [];
+  }
+  const files = [];
+  for (const artifact of artifacts) {
+    if (!artifact || artifact.kind !== 'file') {
+      continue;
+    }
+    if (artifact.attachment === undefined || artifact.attachment === null) {
+      continue;
+    }
+    files.push({
+      attachment: artifact.attachment,
+      name: typeof artifact.name === 'string' && artifact.name.trim() ? artifact.name.trim() : 'attachment.bin',
+    });
+  }
+  return files;
 }
 
 export async function createDiscordRuntime(options) {
@@ -1207,7 +1244,24 @@ export async function createDiscordRuntime(options) {
         if (payload.threadId && payload.threadId !== 'null') {
           extraEnv.JEVONS_THREAD_ID = payload.threadId;
         }
+        const pendingArtifacts = [];
+        const allowedProviders = new Set();
+        for (const entry of runtimeModels) {
+          if (entry && typeof entry.provider === 'string' && entry.provider.trim()) {
+            allowedProviders.add(entry.provider.trim());
+          }
+        }
+
         const runtimeTools = [createBashTool(process.cwd(), extraEnv)];
+        if (authStorage) {
+          runtimeTools.push(createProviderApiTool({
+            authStorage,
+            allowedProviders: [...allowedProviders],
+            onArtifact: (artifact) => {
+              pendingArtifacts.push(artifact);
+            },
+          }));
+        }
 
         let stopTyping = () => { };
         try {
@@ -1219,11 +1273,13 @@ export async function createDiscordRuntime(options) {
             Agent: _Agent,
             resolvePiAgentCore: _resolvePiAgentCore,
             authStorage,
+            artifacts: pendingArtifacts,
           });
 
-          if (reply) {
+          if (reply && (typeof reply.content === 'string' || (Array.isArray(reply.files) && reply.files.length > 0))) {
             await sendMessage({
-              content: reply,
+              content: typeof reply.content === 'string' ? reply.content : '',
+              files: Array.isArray(reply.files) ? reply.files : [],
               channelId: payload.channelId,
               threadId: payload.threadId,
               contextId: payload.contextId,

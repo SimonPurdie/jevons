@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
 import { REST, Routes } from 'discord.js';
 import { getCommandDefinitions } from './commands.js';
+import fs from 'fs';
 
 function isThreadChannel(channel) {
   return Boolean(channel && channel.isThread);
@@ -194,7 +195,15 @@ export function createDiscordBot(options) {
 }
 
 export function sendDiscordMessage(client, payload) {
-  const { content, channelId, threadId } = payload;
+  const {
+    content,
+    files,
+    embeds,
+    components,
+    maxAttachmentBytes = 8 * 1024 * 1024,
+    channelId,
+    threadId,
+  } = payload;
   let targetId = (threadId && threadId !== 'null') ? threadId : channelId;
 
   if (targetId === 'null') targetId = null;
@@ -203,13 +212,51 @@ export function sendDiscordMessage(client, payload) {
     return Promise.reject(new Error('Unable to send message: No valid channelId or threadId provided'));
   }
 
-  const chunks = splitMessage(content);
+  const text = typeof content === 'string' ? content : '';
+  const chunks = text ? splitMessage(text) : [];
+  const { acceptedFiles, fallbackNotes } = normalizeDiscordFiles(files, maxAttachmentBytes);
+  const extraFallback = fallbackNotes.length > 0 ? `\n\n${fallbackNotes.join('\n')}` : '';
+  const firstChunk = `${chunks[0] || ''}${extraFallback}`.trim();
 
   return client.channels.fetch(targetId).then(async (channel) => {
     if (!channel || typeof channel.send !== 'function') {
       throw new Error(`Unable to send message to channel ${targetId}`);
     }
     const results = [];
+    const hasRichPayload = acceptedFiles.length > 0 || Array.isArray(embeds) || Array.isArray(components);
+
+    if (hasRichPayload) {
+      const messagePayload = {};
+      if (firstChunk) {
+        messagePayload.content = firstChunk;
+      }
+      if (acceptedFiles.length > 0) {
+        messagePayload.files = acceptedFiles;
+      }
+      if (Array.isArray(embeds) && embeds.length > 0) {
+        messagePayload.embeds = embeds;
+      }
+      if (Array.isArray(components) && components.length > 0) {
+        messagePayload.components = components;
+      }
+      results.push(await channel.send(messagePayload));
+      for (const chunk of chunks.slice(1)) {
+        results.push(await channel.send(chunk));
+      }
+      return results.length === 1 ? results[0] : results;
+    }
+
+    if (chunks.length === 0) {
+      if (extraFallback.trim()) {
+        results.push(await channel.send(extraFallback.trim()));
+        return results[0];
+      }
+      results.push(await channel.send('...'));
+      return results[0];
+    }
+    if (extraFallback.trim()) {
+      chunks[0] = `${chunks[0]}\n\n${fallbackNotes.join('\n')}`.trim();
+    }
     for (const chunk of chunks) {
       results.push(await channel.send(chunk));
     }
@@ -244,6 +291,66 @@ function splitMessage(text, maxLength = 2000) {
   }
 
   return chunks;
+}
+
+function normalizeDiscordFiles(files, maxAttachmentBytes) {
+  if (!Array.isArray(files) || files.length === 0) {
+    return { acceptedFiles: [], fallbackNotes: [] };
+  }
+
+  const acceptedFiles = [];
+  const fallbackNotes = [];
+  const maxFiles = 10;
+
+  for (const file of files) {
+    if (acceptedFiles.length >= maxFiles) {
+      fallbackNotes.push(`Attachment skipped: too many files (max ${maxFiles}).`);
+      break;
+    }
+    if (!file || typeof file !== 'object') {
+      fallbackNotes.push('Attachment skipped: invalid payload.');
+      continue;
+    }
+
+    const name = typeof file.name === 'string' && file.name.trim() ? file.name : `attachment-${acceptedFiles.length + 1}.bin`;
+    const size = estimateAttachmentSize(file.attachment);
+
+    if (size !== null && size > maxAttachmentBytes) {
+      fallbackNotes.push(
+        `Attachment skipped: "${name}" exceeds ${Math.floor(maxAttachmentBytes / (1024 * 1024))}MB limit.`
+      );
+      continue;
+    }
+
+    if (file.attachment === undefined || file.attachment === null) {
+      fallbackNotes.push(`Attachment skipped: "${name}" has no attachment data.`);
+      continue;
+    }
+
+    acceptedFiles.push({
+      attachment: file.attachment,
+      name,
+    });
+  }
+
+  return { acceptedFiles, fallbackNotes };
+}
+
+function estimateAttachmentSize(attachment) {
+  if (Buffer.isBuffer(attachment)) {
+    return attachment.byteLength;
+  }
+  if (typeof attachment === 'string') {
+    try {
+      if (fs.existsSync(attachment)) {
+        return fs.statSync(attachment).size;
+      }
+    } catch (_err) {
+      return null;
+    }
+    return null;
+  }
+  return null;
 }
 
 export { extractContext, splitMessage };

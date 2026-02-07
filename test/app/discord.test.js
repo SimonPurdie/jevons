@@ -186,3 +186,57 @@ test('sendDiscordMessage sends multiple chunks for long content', async () => {
   assert.equal(sentMessages[0].length, 2000);
   assert.equal(sentMessages[1].length, 500);
 });
+
+test('sendDiscordMessage sends attachments with message payload', async () => {
+  const sentMessages = [];
+  const mockChannel = {
+    send: (msg) => {
+      sentMessages.push(msg);
+      return Promise.resolve({ id: 'msg-' + sentMessages.length });
+    },
+  };
+  const mockClient = {
+    channels: {
+      fetch: () => Promise.resolve(mockChannel),
+    },
+  };
+
+  await sendDiscordMessage(mockClient, {
+    content: 'Here is the file',
+    files: [{ attachment: Buffer.from('abc'), name: 'test.txt' }],
+    channelId: 'root',
+  });
+
+  assert.equal(sentMessages.length, 1);
+  assert.equal(typeof sentMessages[0], 'object');
+  assert.equal(sentMessages[0].content, 'Here is the file');
+  assert.equal(sentMessages[0].files.length, 1);
+  assert.equal(sentMessages[0].files[0].name, 'test.txt');
+});
+
+test('sendDiscordMessage skips oversized attachments and appends fallback note', async () => {
+  const sentMessages = [];
+  const mockChannel = {
+    send: (msg) => {
+      sentMessages.push(msg);
+      return Promise.resolve({ id: 'msg-' + sentMessages.length });
+    },
+  };
+  const mockClient = {
+    channels: {
+      fetch: () => Promise.resolve(mockChannel),
+    },
+  };
+
+  await sendDiscordMessage(mockClient, {
+    content: 'Attempting attachment',
+    files: [{ attachment: Buffer.alloc(9 * 1024 * 1024), name: 'too-big.bin' }],
+    channelId: 'root',
+    maxAttachmentBytes: 8 * 1024 * 1024,
+  });
+
+  assert.equal(sentMessages.length, 1);
+  assert.equal(typeof sentMessages[0], 'string');
+  assert.ok(sentMessages[0].includes('Attempting attachment'));
+  assert.ok(sentMessages[0].includes('Attachment skipped'));
+});
