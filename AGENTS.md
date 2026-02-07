@@ -13,3 +13,6 @@
 
 **Environment Configuration**
 - Added `JEVONS_SESSION_DIR` to the configuration environment map (`app/config.js`). This allows overriding the session directory via environment variables, which is particularly useful for containerized deployments and testing.
+
+**This Document**
+- This AGENTS.md contains information likely to be of assistance when working in this repo. It is a living document maintained by the human user, and by the agents working here. If you encounter a problem with the environment, and come away from that problem with information that would be helpful for future agents to avoid the same issue, then note it down here for their benefit. You should also inform the human user when you do this.
