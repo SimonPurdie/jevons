@@ -17,5 +17,9 @@
 **Sandbox Test Limitation**
 - In restricted/sandboxed environments, tests that open local listeners may fail with `listen EPERM: operation not permitted 127.0.0.1` (observed in `test/app/e2e_history.test.js` and `test/app/logging_integration.test.js`). Run those in an environment that permits loopback binds.
 
+**Discord Upload + undici Compatibility**
+- `@mariozechner/pi-ai` can set a global undici dispatcher from its own undici version. Discord attachment uploads may then fail with `Cannot read properties of null (reading 'byteLength')` from undici internals during multipart sends.
+- Before Discord sends, force a dispatcher from the same undici version used by Discord (`app/discord.js` now calls `setGlobalDispatcher(new EnvHttpProxyAgent())` from the top-level `undici` dependency).
+
 **This Document**
 - This AGENTS.md contains information likely to be of assistance when working in this repo. It is a living document maintained by the human user, and by the agents working here. If you encounter a problem with the environment, and come away from that problem with information that would be helpful for future agents to avoid the same issue, then note it down here for their benefit. You should also inform the human user when you do this.

@@ -1,7 +1,18 @@
 import { EventEmitter } from 'events';
 import { REST, Routes } from 'discord.js';
+import { EnvHttpProxyAgent, setGlobalDispatcher } from 'undici';
 import { getCommandDefinitions } from './commands.js';
 import fs from 'fs';
+import path from 'path';
+
+let discordDispatcher = null;
+
+function ensureDiscordDispatcher() {
+  if (!discordDispatcher) {
+    discordDispatcher = new EnvHttpProxyAgent();
+  }
+  setGlobalDispatcher(discordDispatcher);
+}
 
 function isThreadChannel(channel) {
   return Boolean(channel && channel.isThread);
@@ -219,6 +230,7 @@ export function sendDiscordMessage(client, payload) {
   const firstChunk = `${chunks[0] || ''}${extraFallback}`.trim();
 
   return client.channels.fetch(targetId).then(async (channel) => {
+    ensureDiscordDispatcher();
     if (!channel || typeof channel.send !== 'function') {
       throw new Error(`Unable to send message to channel ${targetId}`);
     }
@@ -230,16 +242,19 @@ export function sendDiscordMessage(client, payload) {
       if (firstChunk) {
         messagePayload.content = firstChunk;
       }
-      if (acceptedFiles.length > 0) {
-        messagePayload.files = acceptedFiles;
-      }
-      if (Array.isArray(embeds) && embeds.length > 0) {
-        messagePayload.embeds = embeds;
-      }
-      if (Array.isArray(components) && components.length > 0) {
-        messagePayload.components = components;
-      }
       try {
+        if (acceptedFiles.length > 0) {
+          messagePayload.files = acceptedFiles.map((file) => ({
+            attachment: file.attachment,
+            name: file.name,
+          }));
+        }
+        if (Array.isArray(embeds) && embeds.length > 0) {
+          messagePayload.embeds = embeds;
+        }
+        if (Array.isArray(components) && components.length > 0) {
+          messagePayload.components = components;
+        }
         results.push(await channel.send(messagePayload));
         for (const chunk of chunks.slice(1)) {
           results.push(await channel.send(chunk));
@@ -247,19 +262,34 @@ export function sendDiscordMessage(client, payload) {
         return results.length === 1 ? results[0] : results;
       } catch (err) {
         const failedFiles = acceptedFiles.map((file) => file.name).join(', ');
-        // eslint-disable-next-line no-console
-        console.error('[Discord] Failed to send rich payload', {
+        logDiscordFailure('Failed to send rich payload', {
           targetId,
           error: err && err.message ? err.message : String(err),
+          stack: err && err.stack ? err.stack : null,
           files: failedFiles,
+          fileMeta: acceptedFiles.map((file) => ({
+            name: file.name,
+            type: Buffer.isBuffer(file.attachment) ? 'buffer' : typeof file.attachment,
+            size: typeof file.size === 'number' ? file.size : estimateAttachmentSize(file.attachment),
+          })),
         });
 
         const failureNotice = acceptedFiles.length > 0
           ? `Attachment upload failed: ${err && err.message ? err.message : 'unknown error'}.`
           : `Rich payload send failed: ${err && err.message ? err.message : 'unknown error'}.`;
         const fallbackContent = [firstChunk, failureNotice].filter(Boolean).join('\n\n').trim() || failureNotice;
-        for (const chunk of splitMessage(fallbackContent)) {
-          results.push(await channel.send(chunk));
+        try {
+          for (const chunk of splitMessage(fallbackContent)) {
+            results.push(await channel.send(chunk));
+          }
+        } catch (fallbackErr) {
+          logDiscordFailure('Fallback text send also failed', {
+            targetId,
+            error: fallbackErr && fallbackErr.message ? fallbackErr.message : String(fallbackErr),
+            stack: fallbackErr && fallbackErr.stack ? fallbackErr.stack : null,
+            originalError: err && err.message ? err.message : String(err),
+          });
+          throw fallbackErr;
         }
         return results.length === 1 ? results[0] : results;
       }
@@ -349,6 +379,7 @@ function normalizeDiscordFiles(files, maxAttachmentBytes) {
     acceptedFiles.push({
       attachment: resolved.attachment,
       name,
+      size,
     });
   }
 
@@ -377,20 +408,54 @@ function resolveAttachment(attachment) {
     return { ok: false, reason: 'has no attachment data' };
   }
   if (Buffer.isBuffer(attachment)) {
-    return { ok: true, attachment, size: attachment.byteLength };
+    try {
+      const stagedPath = stageBufferForDiscordUpload(attachment);
+      return { ok: true, attachment: stagedPath, size: attachment.byteLength };
+    } catch (_err) {
+      return { ok: false, reason: 'buffer attachment could not be staged' };
+    }
   }
   if (typeof attachment === 'string') {
     try {
       if (!fs.existsSync(attachment)) {
         return { ok: false, reason: 'file path does not exist' };
       }
-      const fileBuffer = fs.readFileSync(attachment);
-      return { ok: true, attachment: fileBuffer, size: fileBuffer.byteLength };
+      const stats = fs.statSync(attachment);
+      if (!stats.isFile()) {
+        return { ok: false, reason: 'file path is not a file' };
+      }
+      return { ok: true, attachment, size: stats.size };
     } catch (_err) {
       return { ok: false, reason: 'file path could not be read' };
     }
   }
   return { ok: false, reason: 'uses unsupported attachment type' };
+}
+
+function stageBufferForDiscordUpload(buffer) {
+  const dir = path.join('/tmp', 'jevons-discord-upload');
+  fs.mkdirSync(dir, { recursive: true });
+  const filePath = path.join(dir, `upload-${Date.now()}-${Math.random().toString(16).slice(2)}.bin`);
+  fs.writeFileSync(filePath, buffer);
+  return filePath;
+}
+
+function logDiscordFailure(message, details) {
+  const entry = {
+    timestamp: new Date().toISOString(),
+    message,
+    ...(details || {}),
+  };
+  // eslint-disable-next-line no-console
+  console.error('[Discord]', entry);
+  try {
+    const logDir = path.join(process.cwd(), 'logs');
+    const logPath = path.join(logDir, 'discord_errors.log');
+    fs.mkdirSync(logDir, { recursive: true });
+    fs.appendFileSync(logPath, `${JSON.stringify(entry)}\n`, 'utf8');
+  } catch (_err) {
+    // Ignore secondary logging failures
+  }
 }
 
 export { extractContext, splitMessage };

@@ -7,7 +7,7 @@ const discordSendSchema = Type.Object({
   files: Type.Optional(
     Type.Array(
       Type.Object({
-        path: Type.String({ description: 'Absolute or workspace-relative file path to attach.' }),
+        path: Type.String({ description: 'Absolute or workspace-relative file path to attach. For generated media, prefer provider_api details.artifacts[].storage.path.' }),
         name: Type.Optional(Type.String({ description: 'Optional attachment filename override.' })),
       }),
       { description: 'Files to attach to the message.' }
@@ -29,7 +29,7 @@ export function createDiscordSendTool(options = {}) {
     name: 'discord_send',
     label: 'discord_send',
     description:
-      'Send a Discord message directly (text and optional file attachments). Use for proactive updates or explicit file delivery.',
+      'Send a Discord message directly (text and optional file attachments). For generated media, pass files[].path from provider_api details.artifacts[].storage.path. Treat send as successful only when this tool returns details.ok=true.',
     parameters: discordSendSchema,
     execute: async (_toolCallId, params) => {
       const content = typeof params?.content === 'string' ? params.content : '';

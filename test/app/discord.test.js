@@ -291,18 +291,15 @@ test('sendDiscordMessage resolves file path attachments to Buffer payloads', asy
     },
   };
 
-  try {
-    await sendDiscordMessage(mockClient, {
-      content: 'Path attachment',
-      files: [{ attachment: filePath, name: 'artifact.png' }],
-      channelId: 'root',
-    });
-  } finally {
-    fs.rmSync(tempDir, { recursive: true, force: true });
-  }
+  await sendDiscordMessage(mockClient, {
+    content: 'Path attachment',
+    files: [{ attachment: filePath, name: 'artifact.png' }],
+    channelId: 'root',
+  });
 
   assert.equal(sentMessages.length, 1);
   assert.equal(typeof sentMessages[0], 'object');
-  assert.ok(Buffer.isBuffer(sentMessages[0].files[0].attachment));
+  assert.equal(typeof sentMessages[0].files[0].attachment, 'string');
   assert.equal(sentMessages[0].files[0].name, 'artifact.png');
+  fs.rmSync(tempDir, { recursive: true, force: true });
 });
