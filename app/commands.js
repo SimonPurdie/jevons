@@ -22,5 +22,16 @@ export function getCommandDefinitions() {
         new SlashCommandBuilder()
             .setName('fork')
             .setDescription('Branch conversation from an earlier message'),
+        new SlashCommandBuilder()
+            .setName('model')
+            .setDescription('List, add, and switch active model')
+            .addStringOption(option =>
+                option.setName('provider')
+                    .setDescription('Provider ID (for adding/switching)')
+                    .setRequired(false))
+            .addStringOption(option =>
+                option.setName('model')
+                    .setDescription('Model ID (for adding/switching)')
+                    .setRequired(false)),
     ];
 }

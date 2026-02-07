@@ -4,6 +4,7 @@ import { DiscordSessionManager } from './sessionManager.js';
 import { performCompaction } from './compaction.js';
 import { loadSkill } from '../skills/loader.js';
 import { createBashTool } from './tools/bash.js';
+import { readConfigFile, saveConfig } from './config.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -223,6 +224,110 @@ function formatTimeAgo(date) {
   }
 }
 
+const MODEL_SELECT_MENU_PREFIX = 'model_switch_select';
+const MODELS_PER_PAGE = 23;
+
+function truncateForDiscord(value, max = 100) {
+  const text = typeof value === 'string' ? value : '';
+  return text.length > max ? `${text.slice(0, max - 3)}...` : text;
+}
+
+function toModelId(modelEntry) {
+  if (!modelEntry || typeof modelEntry !== 'object') {
+    return null;
+  }
+  if (typeof modelEntry.provider !== 'string' || typeof modelEntry.model !== 'string') {
+    return null;
+  }
+  const provider = modelEntry.provider.trim();
+  const model = modelEntry.model.trim();
+  if (!provider || !model) {
+    return null;
+  }
+  return `${provider}/${model}`;
+}
+
+function normalizeModels(models) {
+  if (!Array.isArray(models)) {
+    return [];
+  }
+  const normalized = [];
+  for (const entry of models) {
+    const id = toModelId(entry);
+    if (!id) continue;
+    const firstSlash = id.indexOf('/');
+    const provider = id.slice(0, firstSlash);
+    const model = id.slice(firstSlash + 1);
+    normalized.push({ provider, model });
+  }
+  return normalized;
+}
+
+function parseModelSelectCustomId(customId) {
+  if (typeof customId !== 'string' || !customId.startsWith(`${MODEL_SELECT_MENU_PREFIX}:`)) {
+    return null;
+  }
+  const raw = customId.slice(`${MODEL_SELECT_MENU_PREFIX}:`.length);
+  const page = Number.parseInt(raw, 10);
+  return Number.isFinite(page) ? page : 0;
+}
+
+function createModelMenuView(models, activeModel, requestedPage = 0, contentPrefix = '') {
+  const safeModels = normalizeModels(models);
+  if (safeModels.length === 0) {
+    return {
+      content: `${contentPrefix}No models configured. Add one with \`/model provider:<provider> model:<model>\`.`,
+      components: [],
+    };
+  }
+
+  const totalPages = Math.max(1, Math.ceil(safeModels.length / MODELS_PER_PAGE));
+  const page = Math.max(0, Math.min(requestedPage, totalPages - 1));
+  const start = page * MODELS_PER_PAGE;
+  const pageItems = safeModels.slice(start, start + MODELS_PER_PAGE);
+
+  const options = pageItems.map((entry, offset) => {
+    const absoluteIndex = start + offset;
+    const id = `${entry.provider}/${entry.model}`;
+    const isActive = id === activeModel;
+    return {
+      label: truncateForDiscord(isActive ? `${id} (active)` : id),
+      description: truncateForDiscord(`Provider: ${entry.provider}`),
+      value: `set:${absoluteIndex}`,
+    };
+  });
+
+  if (totalPages > 1) {
+    if (page > 0) {
+      options.push({
+        label: 'Previous page',
+        description: `Page ${page} of ${totalPages}`,
+        value: 'nav:prev',
+      });
+    }
+    if (page < totalPages - 1) {
+      options.push({
+        label: 'Next page',
+        description: `Page ${page + 2} of ${totalPages}`,
+        value: 'nav:next',
+      });
+    }
+  }
+
+  const selectMenu = new StringSelectMenuBuilder()
+    .setCustomId(`${MODEL_SELECT_MENU_PREFIX}:${page}`)
+    .setPlaceholder('Choose a model or change page')
+    .addOptions(options);
+
+  const row = new ActionRowBuilder().addComponents(selectMenu);
+  const prefix = contentPrefix ? `${contentPrefix}\n` : '';
+
+  return {
+    content: `${prefix}Active model: \`${activeModel || 'None'}\`\nModels: ${safeModels.length} (page ${page + 1}/${totalPages})`,
+    components: [row],
+  };
+}
+
 function normalizeHistoryMessages(history, modelInstance) {
   if (!Array.isArray(history)) {
     return [];
@@ -356,6 +461,7 @@ export async function createDiscordRuntime(options) {
     sessionDir,
     skillsDir,
     ipcPort,
+    configPath,
     deps = {},
     authStorage,
   } = options || {};
@@ -413,31 +519,68 @@ export async function createDiscordRuntime(options) {
     return () => clearInterval(interval);
   }
 
+  const effectiveConfigPath = configPath || path.join(process.cwd(), 'config', 'config.json');
+  let runtimeModels = normalizeModels(models);
+  let runtimeActiveModel = typeof activeModel === 'string' ? activeModel : null;
   let resolvedModel = modelInstance;
-  if (!resolvedModel) {
+
+  async function resolveModelById(modelId) {
+    if (typeof modelId !== 'string' || !modelId.includes('/')) {
+      return null;
+    }
+    const firstSlash = modelId.indexOf('/');
+    const provider = modelId.slice(0, firstSlash);
+    const modelName = modelId.slice(firstSlash + 1);
+    if (!provider || !modelName) {
+      return null;
+    }
     const piAi = await _resolvePiAi();
     const getModelFn = getModelOverride || piAi.getModel;
+    return getModelFn(provider, modelName, providers) || null;
+  }
 
-    let targetProvider;
-    let targetModel;
+  async function persistModelSettings(nextActiveModel, nextModels) {
+    const diskConfig = readConfigFile(effectiveConfigPath);
+    diskConfig.activeModel = nextActiveModel;
+    diskConfig.models = nextModels;
+    saveConfig(diskConfig, { configPath: effectiveConfigPath });
+  }
 
-    if (activeModel && typeof activeModel === 'string' && activeModel.includes('/')) {
-      [targetProvider, targetModel] = activeModel.split('/');
-    } else if (Array.isArray(models) && models.length > 0) {
-      // Fallback to first model in list
-      targetProvider = models[0].provider;
-      targetModel = models[0].model;
+  async function switchActiveModel(nextModelId, nextModels) {
+    await persistModelSettings(nextModelId, nextModels);
+    runtimeModels = normalizeModels(nextModels);
+    runtimeActiveModel = nextModelId;
+
+    try {
+      const model = await resolveModelById(nextModelId);
+      if (model) {
+        resolvedModel = model;
+        return { switchedInRuntime: true };
+      }
+      return { switchedInRuntime: false, warning: 'Model saved, but runtime could not resolve it immediately.' };
+    } catch (err) {
+      return { switchedInRuntime: false, warning: `Model saved, but runtime switch failed: ${err.message}` };
+    }
+  }
+
+  if (!resolvedModel) {
+    let targetModelId = runtimeActiveModel;
+    if ((!targetModelId || !targetModelId.includes('/')) && runtimeModels.length > 0) {
+      targetModelId = toModelId(runtimeModels[0]);
+      runtimeActiveModel = targetModelId;
     }
 
-    if (!targetProvider || !targetModel) {
-      // Construct a helpful error message
+    if (!targetModelId) {
       const configDebug = { activeModel, modelsLength: Array.isArray(models) ? models.length : 0 };
       throw new Error(`No active model configuration found or activeModel format invalid. Please check config.json. Debug: ${JSON.stringify(configDebug)}`);
     }
 
-    resolvedModel = getModelFn(targetProvider, targetModel, providers);
-    // getModel might return null/undefined if provider not found
-    if (!resolvedModel) {
+    const model = await resolveModelById(targetModelId);
+    if (!model) {
+      const firstSlash = targetModelId.indexOf('/');
+      const targetProvider = targetModelId.slice(0, firstSlash);
+      const targetModel = targetModelId.slice(firstSlash + 1);
+      const piAi = await _resolvePiAi();
       const getModelsFn = piAi.getModels;
       const available = typeof getModelsFn === 'function' ? getModelsFn(targetProvider) : [];
       const names = available.map((entry) => entry.id || entry);
@@ -445,6 +588,11 @@ export async function createDiscordRuntime(options) {
       const suffix = names.length > 10 ? '…' : '';
       throw new Error(`Unknown model "${targetModel}" for provider "${targetProvider}". Available: ${preview}${suffix}`);
     }
+    resolvedModel = model;
+  }
+
+  if (!runtimeActiveModel && resolvedModel && resolvedModel.provider && resolvedModel.id) {
+    runtimeActiveModel = `${resolvedModel.provider}/${resolvedModel.id}`;
   }
 
   function isNewCommand(content) {
@@ -549,6 +697,125 @@ export async function createDiscordRuntime(options) {
               await payload.interaction.reply('Failed to list sessions. Please try again.');
             } catch (replyErr) {
               // Ignore secondary errors
+            }
+          }
+          return;
+        }
+
+        if (payload.commandName === 'model') {
+          try {
+            const providerInput = payload.interaction.options?.getString('provider');
+            const modelInput = payload.interaction.options?.getString('model');
+
+            if ((providerInput && !modelInput) || (!providerInput && modelInput)) {
+              await payload.interaction.reply({
+                content: 'Provide both `provider` and `model`, or omit both to list models.',
+                ephemeral: true,
+              });
+              return;
+            }
+
+            if (providerInput && modelInput) {
+              const provider = providerInput.trim();
+              const modelName = modelInput.trim();
+              if (!provider || !modelName) {
+                await payload.interaction.reply({
+                  content: 'Provider and model must be non-empty strings.',
+                  ephemeral: true,
+                });
+                return;
+              }
+
+              const selectedId = `${provider}/${modelName}`;
+              const nextModels = [...runtimeModels];
+              const exists = nextModels.some((entry) => toModelId(entry) === selectedId);
+              if (!exists) {
+                nextModels.push({ provider, model: modelName });
+              }
+
+              const switchResult = await switchActiveModel(selectedId, nextModels);
+              const selectedIndex = nextModels.findIndex((entry) => toModelId(entry) === selectedId);
+              const selectedPage = selectedIndex >= 0 ? Math.floor(selectedIndex / MODELS_PER_PAGE) : 0;
+              const status = exists ? 'Switched active model.' : 'Added model and switched active model.';
+              const warning = switchResult.warning ? `\n${switchResult.warning}` : '';
+              const view = createModelMenuView(nextModels, runtimeActiveModel, selectedPage, `${status}${warning}`);
+              await payload.interaction.reply({
+                ...view,
+                ephemeral: true,
+              });
+              return;
+            }
+
+            const view = createModelMenuView(runtimeModels, runtimeActiveModel, 0);
+            await payload.interaction.reply({
+              ...view,
+              ephemeral: true,
+            });
+          } catch (err) {
+            if (typeof onError === 'function') {
+              onError(err);
+            }
+            try {
+              await payload.interaction.reply({
+                content: `Failed to manage models: ${err.message}`,
+                ephemeral: true,
+              });
+            } catch (_replyErr) {
+              // Ignore secondary errors
+            }
+          }
+          return;
+        }
+
+        if (payload.isSelectMenu && typeof payload.customId === 'string' && payload.customId.startsWith(`${MODEL_SELECT_MENU_PREFIX}:`)) {
+          try {
+            const currentPage = parseModelSelectCustomId(payload.customId) || 0;
+            const selectedValue = payload.values && payload.values[0] ? payload.values[0] : '';
+
+            if (selectedValue === 'nav:prev' || selectedValue === 'nav:next') {
+              const nextPage = selectedValue === 'nav:next' ? currentPage + 1 : currentPage - 1;
+              const view = createModelMenuView(runtimeModels, runtimeActiveModel, nextPage);
+              await payload.interaction.update(view);
+              return;
+            }
+
+            if (!selectedValue.startsWith('set:')) {
+              const view = createModelMenuView(runtimeModels, runtimeActiveModel, currentPage, 'Unknown selection.');
+              await payload.interaction.update(view);
+              return;
+            }
+
+            const selectedIndex = Number.parseInt(selectedValue.slice(4), 10);
+            if (!Number.isFinite(selectedIndex) || selectedIndex < 0 || selectedIndex >= runtimeModels.length) {
+              const view = createModelMenuView(runtimeModels, runtimeActiveModel, currentPage, 'Selected model is no longer available.');
+              await payload.interaction.update(view);
+              return;
+            }
+
+            const selectedEntry = runtimeModels[selectedIndex];
+            const selectedId = toModelId(selectedEntry);
+            if (!selectedId) {
+              const view = createModelMenuView(runtimeModels, runtimeActiveModel, currentPage, 'Selected model entry is invalid.');
+              await payload.interaction.update(view);
+              return;
+            }
+
+            const switchResult = await switchActiveModel(selectedId, runtimeModels);
+            const warning = switchResult.warning ? `\n${switchResult.warning}` : '';
+            const page = Math.floor(selectedIndex / MODELS_PER_PAGE);
+            const view = createModelMenuView(runtimeModels, runtimeActiveModel, page, `Switched active model to \`${selectedId}\`.${warning}`);
+            await payload.interaction.update(view);
+          } catch (err) {
+            if (typeof onError === 'function') {
+              onError(err);
+            }
+            try {
+              await payload.interaction.reply({
+                content: `Failed to switch model: ${err.message}`,
+                ephemeral: true,
+              });
+            } catch (_replyErr) {
+              // Ignore
             }
           }
           return;
