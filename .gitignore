@@ -3,3 +3,4 @@ config/.env
 config/auth.json
 .geoff/
 logs/
+identity/memory/
