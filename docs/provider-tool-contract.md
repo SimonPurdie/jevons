@@ -30,6 +30,17 @@ Canonical shape:
     "action": "request",
     "status": 200,
     "contentType": "image/png",
+    "preview": "short textual summary",
+    "dataOmitted": true,
+    "fullData": {
+      "contentType": "application/json",
+      "size": 98432,
+      "storage": {
+        "kind": "temp_file",
+        "path": "/tmp/jevons-artifacts/1770478733796-...-google-response.json",
+        "ephemeral": true
+      }
+    },
     "artifacts": [
       {
         "kind": "file",
@@ -67,6 +78,7 @@ Runtime artifact objects (captured from tools, then consumed by Discord dispatch
 
 - Raw binary HTTP responses (for example `Content-Type: image/png`)
 - JSON responses containing inline payload blocks (`inlineData` or `inline_data`) with base64 `data` and image MIME type
+- Large JSON/text payloads may be persisted as `details.fullData` (temp file pointer) with compact inline preview in `content`/`details.preview`.
 
 ## Error Codes
 

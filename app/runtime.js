@@ -173,6 +173,7 @@ function buildSystemPrompt(skills, workspaceFilesContent, workspaceFilesBaseDir)
     '- For image generation, use image-capable models/endpoints only.\n' +
     '- Call `provider_api` with `action: "request"` and explicit `params.url`.\n' +
     '- Prefer `params.responseType: "json"` for Gemini-style JSON responses with `inlineData` image parts.\n' +
+    '- If `provider_api` returns `details.fullData.storage.path`, inspect that file with tools before making exact claims from large payloads.\n' +
     '- If the API response has no real image bytes, do not fabricate output; explain capability mismatch and ask user to enable an image-capable endpoint.'
   );
 

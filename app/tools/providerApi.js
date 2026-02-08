@@ -5,6 +5,7 @@ import path from 'path';
 import crypto from 'crypto';
 
 const MAX_TEXT_PREVIEW = 4000;
+const MAX_DETAILS_DATA_CHARS = 8000;
 
 const providerApiSchema = Type.Object({
   provider: Type.String({ description: 'Provider id configured in Jevons (for example: google, openai, anthropic)' }),
@@ -152,10 +153,22 @@ export function createProviderApiTool(options = {}) {
         }
 
         const preview = previewText(bodyResult.preview);
+        const fullData = persistFullResponseIfLarge({
+          provider,
+          contentType,
+          responseType,
+          bodyResult,
+        });
+        const includeDataInline = !fullData;
+
+        let message = `Provider request completed (${status}).\n${preview}`;
+        if (fullData) {
+          message += `\n\nFull response saved to: ${fullData.storage.path}`;
+        }
         return {
           content: [{
             type: 'text',
-            text: `Provider request completed (${status}).\n${preview}`,
+            text: message,
           }],
           details: {
             ok: response.ok,
@@ -164,7 +177,10 @@ export function createProviderApiTool(options = {}) {
             action,
             status,
             contentType,
-            data: bodyResult.data,
+            preview,
+            data: includeDataInline ? bodyResult.data : undefined,
+            dataOmitted: !includeDataInline,
+            fullData: fullData || undefined,
           },
         };
       } catch (err) {
@@ -200,12 +216,13 @@ function normalizeRequestParams(raw) {
   if (!url) {
     throw createToolError('invalid_request', 'params.url is required for action "request"');
   }
+  const body = params.body !== undefined ? params.body : params.data;
 
   return {
     url,
     method: typeof params.method === 'string' && params.method.trim() ? params.method.trim() : 'GET',
     headers: normalizeHeaders(params.headers),
-    body: params.body,
+    body,
     responseType: typeof params.responseType === 'string' ? params.responseType.trim().toLowerCase() : '',
     filename: typeof params.filename === 'string' && params.filename.trim() ? params.filename.trim() : '',
     auth: params.auth && typeof params.auth === 'object' ? params.auth : {},
@@ -313,13 +330,43 @@ async function parseNonBinaryResponse(response, responseType) {
   if (responseType === 'json') {
     try {
       const data = await response.json();
-      return { data, preview: JSON.stringify(data, null, 2) };
+      const fullText = JSON.stringify(data, null, 2);
+      return {
+        data,
+        preview: buildJsonPreview(data),
+        fullText,
+      };
     } catch (err) {
       throw createToolError('response_parse_failed', `Failed to parse JSON response: ${err.message}`);
     }
   }
   const text = await response.text();
-  return { data: text, preview: text };
+  return { data: text, preview: text, fullText: text };
+}
+
+function buildJsonPreview(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    return JSON.stringify(data, null, 2);
+  }
+
+  // Model-list responses can be very large; summarize to preserve all names.
+  if (Array.isArray(data.models)) {
+    const names = data.models
+      .map((model) => (model && typeof model === 'object' ? model.name : null))
+      .filter((name) => typeof name === 'string' && name.trim().length > 0);
+    if (names.length > 0) {
+      const summary = {
+        modelCount: names.length,
+        models: names,
+      };
+      if (typeof data.nextPageToken === 'string' && data.nextPageToken.trim()) {
+        summary.nextPageToken = data.nextPageToken.trim();
+      }
+      return JSON.stringify(summary, null, 2);
+    }
+  }
+
+  return JSON.stringify(data, null, 2);
 }
 
 function previewText(value) {
@@ -379,6 +426,43 @@ function stageTempArtifact(buffer, filename) {
   const filePath = path.join(root, `${Date.now()}-${crypto.randomBytes(4).toString('hex')}-${safeName}`);
   fs.writeFileSync(filePath, buffer);
   return filePath;
+}
+
+function persistFullResponseIfLarge({ provider, contentType, responseType, bodyResult }) {
+  const fullText = typeof bodyResult?.fullText === 'string' ? bodyResult.fullText : '';
+  if (!fullText || fullText.length <= MAX_DETAILS_DATA_CHARS) {
+    return null;
+  }
+
+  const extension = inferTextExtension(contentType, responseType);
+  const filename = `${provider}-${Date.now()}-response.${extension}`;
+  const stagedPath = stageTempArtifact(Buffer.from(fullText, 'utf8'), filename);
+  return {
+    contentType: textContentType(contentType, responseType),
+    size: Buffer.byteLength(fullText, 'utf8'),
+    storage: {
+      kind: 'temp_file',
+      path: stagedPath,
+      ephemeral: true,
+    },
+  };
+}
+
+function inferTextExtension(contentType, responseType) {
+  if (responseType === 'json' || (contentType || '').includes('json')) {
+    return 'json';
+  }
+  return 'txt';
+}
+
+function textContentType(contentType, responseType) {
+  if (typeof contentType === 'string' && contentType.trim()) {
+    return contentType;
+  }
+  if (responseType === 'json') {
+    return 'application/json';
+  }
+  return 'text/plain';
 }
 
 function extractInlineArtifactsFromData(data, options = {}) {

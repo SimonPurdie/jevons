@@ -22,5 +22,10 @@
 - `@mariozechner/pi-ai` can set a global undici dispatcher from its own undici version. Discord attachment uploads may then fail with `Cannot read properties of null (reading 'byteLength')` from undici internals during multipart sends.
 - Before Discord sends, force a dispatcher from the same undici version used by Discord (`app/discord.js` now calls `setGlobalDispatcher(new EnvHttpProxyAgent())` from the top-level `undici` dependency).
 
+**Provider API model-list truncation**
+- `provider_api` text previews are capped (`MAX_TEXT_PREVIEW`) and can truncate large JSON payloads (like `GET .../v1beta/models`) before newer model names appear.
+- For model discovery, prefer a compact summary of model names/count (or inspect `details.data`) instead of reasoning from truncated descriptions.
+- `provider_api` now persists oversized JSON/text payloads to `details.fullData.storage.path`; use that path for exact checks (e.g. `rg`/`jq`) when preview data is abbreviated.
+
 **This Document**
 - This AGENTS.md contains information likely to be of assistance when working in this repo. It is a living document maintained by the human user, and by the agents working here. If you encounter a problem with the environment, and come away from that problem with information that would be helpful for future agents to avoid the same issue, then note it down here for their benefit. You should also inform the human user when you do this.
