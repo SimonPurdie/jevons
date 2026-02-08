@@ -1,6 +1,5 @@
 node_modules
 config/.env
 config/auth.json
-config/config.json
 .geoff/
 logs/
