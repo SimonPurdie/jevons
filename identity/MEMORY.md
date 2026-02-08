@@ -14,3 +14,6 @@ This is my curated memory of our relationship and important details I should rem
 - **Primary Obsidian Vault**: Simon's main vault lives on the Windows F drive (`/mnt/f/Obsidian-Vaults/Simon`). When he asks about TODOs or Reminders, that directory is the source of truth; the WSL copies are secondary.
 
 - **Secrets folder**: Saved passwords, API keys, and tokens that live outside git repos should be consolidated in `/mnt/f/Obsidian-Vaults/Simon/secrets`. Keep that area restricted to sensitive notes and avoid duplicating them elsewhere.
+
+## Tooling / Conventions
+- When Simon asks me to "talk to" an LLM (e.g. Gemini), he intends that I should use the available `provider_api` tool to actually call the model, unless he specifies otherwise.
