@@ -13,6 +13,7 @@
 
 **Environment Configuration**
 - Added `JEVONS_SESSION_DIR` to the configuration environment map (`app/config.js`). This allows overriding the session directory via environment variables, which is particularly useful for containerized deployments and testing.
+- If `JEVONS_SESSION_DIR` is set in shell startup files, it overrides `config/config.json`. Ensure it is unset (or set to `~/projects/jevons/identity/memory`) during the monorepo identity layout.
 
 **Sandbox Test Limitation**
 - In restricted/sandboxed environments, tests that open local listeners may fail with `listen EPERM: operation not permitted 127.0.0.1` (observed in `test/app/e2e_history.test.js` and `test/app/logging_integration.test.js`). Run those in an environment that permits loopback binds.

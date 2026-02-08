@@ -43,5 +43,5 @@
     "timezone": "Europe/London",
     "user_id": "120638630254346240"
   },
-  "sessionDir": "/home/simon/jevons/memory"
+  "sessionDir": "./identity/memory"
 }

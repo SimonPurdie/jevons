@@ -155,7 +155,7 @@ function readWorkspaceFiles(fileNames, baseDir) {
   return content;
 }
 
-function buildSystemPrompt(skills, workspaceFilesContent) {
+function buildSystemPrompt(skills, workspaceFilesContent, workspaceFilesBaseDir) {
   let sections = [];
 
   if (skills && skills.length > 0) {
@@ -164,7 +164,7 @@ function buildSystemPrompt(skills, workspaceFilesContent) {
   }
 
   if (workspaceFilesContent) {
-    const header = `- **Workspace Files (injected)**: AGENTS.md SOUL.md TOOLS.md IDENTITY.md USER.md ( all located in /home/simon/jevons and labelled with their full path and filename before their content )`;
+    const header = `- **Workspace Files (injected)**: AGENTS.md SOUL.md TOOLS.md IDENTITY.md USER.md ( all located in ${workspaceFilesBaseDir} and labelled with their full path and filename before their content )`;
     sections.push(`${header}\n${workspaceFilesContent}`);
   }
 
@@ -380,8 +380,9 @@ export async function generateReply(payload, modelInstance, options = {}) {
   }
 
   const workspaceFileNames = ['AGENTS.md', 'SOUL.md', 'TOOLS.md', 'IDENTITY.md', 'USER.md'];
-  const workspaceFilesContent = readWorkspaceFiles(workspaceFileNames, '/home/simon/jevons');
-  const systemPrompt = buildSystemPrompt(options.skills, workspaceFilesContent);
+  const workspaceFilesBaseDir = path.join(process.cwd(), 'identity');
+  const workspaceFilesContent = readWorkspaceFiles(workspaceFileNames, workspaceFilesBaseDir);
+  const systemPrompt = buildSystemPrompt(options.skills, workspaceFilesContent, workspaceFilesBaseDir);
   const historyMessages = normalizeHistoryMessages(sessionContext.messages || [], modelInstance);
 
   const agent = new AgentClass({

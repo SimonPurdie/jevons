@@ -17,6 +17,13 @@ Designed for simplicity, ease of interaction, elegance of design, and to be easy
 
 ## Usage
 
+### Identity Workspace
+
+Canonical assistant identity/config/memory files now live inside this repo at `identity/`:
+
+- `identity/AGENTS.md`, `identity/IDENTITY.md`, `identity/SOUL.md`, `identity/TOOLS.md`, `identity/USER.md`, `identity/MEMORY.md`
+- Session logs under `identity/memory/` (set via `config/config.json` `sessionDir`)
+
 ### Discord Commands
 
 - `/new` - End current context window and reset chat history (creates new log file)
