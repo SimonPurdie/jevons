@@ -59,6 +59,16 @@ test('loadConfig applies environment overrides', () => {
   assert.equal(config.activeModel, 'coding');
 });
 
+test('loadConfig applies agent debug interaction limit override', () => {
+  const dir = makeTempDir();
+  writeConfig(dir, {});
+  const env = {
+    JEVONS_AGENT_DEBUG_INTERACTIONS: '7',
+  };
+  const config = loadConfig({ cwd: dir, env });
+  assert.equal(config.debug.agentLogInteractions, '7');
+});
+
 test('loadConfig ignores legacy env vars for models', () => {
   const dir = makeTempDir();
   writeConfig(dir, {});

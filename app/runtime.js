@@ -12,6 +12,52 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const DEFAULT_AGENT_DEBUG_INTERACTION_LIMIT = 3;
+
+function normalizeAgentDebugInteractionLimit(value) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return DEFAULT_AGENT_DEBUG_INTERACTION_LIMIT;
+  }
+  return parsed;
+}
+
+function parseAgentDebugInteractions(raw) {
+  if (typeof raw !== 'string' || !raw.trim()) {
+    return [];
+  }
+
+  const interactions = [];
+  const interactionPattern = /--- INTERACTION START: [^\n]* ---\n([\s\S]*?)\n--- INTERACTION END ---/g;
+  let match;
+  while ((match = interactionPattern.exec(raw)) !== null) {
+    try {
+      const parsed = JSON.parse(match[1]);
+      if (parsed && typeof parsed === 'object') {
+        interactions.push(parsed);
+      }
+    } catch (err) {
+      // Ignore malformed historical entries
+    }
+  }
+
+  return interactions;
+}
+
+function formatAgentDebugInteractions(interactions) {
+  if (!Array.isArray(interactions) || interactions.length === 0) {
+    return '';
+  }
+
+  return interactions
+    .map((entry) => {
+      const timestamp = typeof entry.timestamp === 'string' && entry.timestamp.trim()
+        ? entry.timestamp
+        : new Date().toISOString();
+      return `--- INTERACTION START: ${timestamp} ---\n${JSON.stringify(entry, null, 2)}\n--- INTERACTION END ---`;
+    })
+    .join('\n\n') + '\n';
+}
 
 async function resolvePiAi() {
   try {
@@ -85,11 +131,16 @@ function normalizePiAiMessages(messages, modelInstance) {
   });
 }
 
-function logAgentInteraction(agent, userContent, timestamp) {
-  const logsDir = path.join(process.cwd(), 'logs');
-  const debugLogPath = path.join(logsDir, 'agent_debug.log');
+function logAgentInteraction(agent, userContent, timestamp, options = {}) {
+  const interactionLimit = normalizeAgentDebugInteractionLimit(options.maxInteractions);
+  const debugLogPath = typeof options.debugLogPath === 'string' && options.debugLogPath.trim()
+    ? options.debugLogPath
+    : path.join(process.cwd(), 'logs', 'agent_debug.log');
+  const logsDir = path.dirname(debugLogPath);
 
   try {
+    fs.mkdirSync(logsDir, { recursive: true });
+
     const logEntry = {
       timestamp: new Date().toISOString(),
       userPrompt: {
@@ -104,11 +155,15 @@ function logAgentInteraction(agent, userContent, timestamp) {
       messages: agent.state.messages,
     };
 
-    const logString = `--- INTERACTION START: ${logEntry.timestamp} ---\n` +
-      JSON.stringify(logEntry, null, 2) +
-      `\n--- INTERACTION END ---\n\n`;
+    const existingRaw = fs.existsSync(debugLogPath)
+      ? fs.readFileSync(debugLogPath, 'utf8')
+      : '';
+    const existingEntries = parseAgentDebugInteractions(existingRaw);
+    existingEntries.push(logEntry);
 
-    fs.appendFileSync(debugLogPath, logString, 'utf8');
+    const rolledEntries = existingEntries.slice(-interactionLimit);
+    const logString = formatAgentDebugInteractions(rolledEntries);
+    fs.writeFileSync(debugLogPath, logString, 'utf8');
   } catch (err) {
     // Silently fail - logging should not interrupt bot operation
   }
@@ -419,7 +474,10 @@ export async function generateReply(payload, modelInstance, options = {}) {
     timestamp: Date.now(),
   });
 
-  logAgentInteraction(agent, content, Date.now());
+  logAgentInteraction(agent, content, Date.now(), {
+    maxInteractions: options.agentDebugInteractionLimit,
+    debugLogPath: options.agentDebugLogPath,
+  });
 
   // Get the absolute latest message from the agent's state
   const latestMessage = agent.state.messages[agent.state.messages.length - 1];
@@ -510,6 +568,8 @@ export async function createDiscordRuntime(options) {
     skillsDir,
     ipcPort,
     configPath,
+    agentDebugInteractionLimit: configuredAgentDebugInteractionLimit,
+    agentDebugLogPath,
     deps = {},
     authStorage,
   } = options || {};
@@ -517,6 +577,7 @@ export async function createDiscordRuntime(options) {
   const _Agent = deps.Agent;
   const _resolvePiAi = deps.resolvePiAi || resolvePiAi;
   const _resolvePiAgentCore = deps.resolvePiAgentCore || resolvePiAgentCore;
+  const agentDebugInteractionLimit = normalizeAgentDebugInteractionLimit(configuredAgentDebugInteractionLimit);
 
   if (typeof sendMessage !== 'function') {
     throw new Error('sendMessage callback is required');
@@ -1297,6 +1358,8 @@ export async function createDiscordRuntime(options) {
             resolvePiAgentCore: _resolvePiAgentCore,
             authStorage,
             artifacts: pendingArtifacts,
+            agentDebugInteractionLimit,
+            agentDebugLogPath,
           });
 
           if (reply && (typeof reply.content === 'string' || (Array.isArray(reply.files) && reply.files.length > 0))) {

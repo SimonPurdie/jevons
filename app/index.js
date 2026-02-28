@@ -81,6 +81,7 @@ export async function startDiscordRuntime(deps = {}) {
     authStorage,
     skillsDir: path.join(__dirname, '../skills'),
     sessionDir: getSessionDir(config),
+    agentDebugInteractionLimit: config.debug?.agentLogInteractions,
     sendMessage,
     ipcPort,
     onReady: () => {

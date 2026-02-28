@@ -72,6 +72,20 @@ function flush(ms = 100) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function readDebugInteractions(logPath) {
+  if (!fs.existsSync(logPath)) {
+    return [];
+  }
+  const raw = fs.readFileSync(logPath, 'utf8');
+  const entries = [];
+  const pattern = /--- INTERACTION START: [^\n]* ---\n([\s\S]*?)\n--- INTERACTION END ---/g;
+  let match;
+  while ((match = pattern.exec(raw)) !== null) {
+    entries.push(JSON.parse(match[1]));
+  }
+  return entries;
+}
+
 test('createDiscordRuntime sends model reply via sendMessage', async () => {
   const client = new MockDiscordClient();
   const sends = [];
@@ -248,6 +262,85 @@ test('createDiscordRuntime passes chat history from session to model', async () 
     assert.equal(calls.length, 2);
     assert.equal(calls[0].length, 1); // current user message
     assert.equal(calls[1].length, 3); // history (user, agent) + current user message
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('createDiscordRuntime rolls debug log entries with configured limit', async () => {
+  const client = new MockDiscordClient();
+  const modelInstance = {
+    id: 'model-test',
+    completeSimple: async () => ({
+      content: [{ type: 'text', text: 'ok' }],
+    })
+  };
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jevons-runtime-debug-log-'));
+  const debugLogPath = path.join(tempDir, 'agent_debug.log');
+
+  try {
+    await createDiscordRuntime({
+      client,
+      token: 'token-123',
+      channelId: 'root',
+      modelInstance,
+      sendMessage: () => Promise.resolve(),
+      agentDebugInteractionLimit: 2,
+      agentDebugLogPath: debugLogPath,
+      deps: { Agent: MockAgent }
+    });
+
+    client.emit('messageCreate', makeMessage({ channelId: 'root', content: 'First message', messageId: 'd1' }));
+    await flush(200);
+    client.emit('messageCreate', makeMessage({ channelId: 'root', content: 'Second message', messageId: 'd2' }));
+    await flush(200);
+    client.emit('messageCreate', makeMessage({ channelId: 'root', content: 'Third message', messageId: 'd3' }));
+    await flush(200);
+
+    const interactions = readDebugInteractions(debugLogPath);
+    assert.equal(interactions.length, 2);
+    assert.ok(interactions[0].userPrompt.content.includes('Second message'));
+    assert.ok(interactions[1].userPrompt.content.includes('Third message'));
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('createDiscordRuntime defaults debug log to last 3 interactions', async () => {
+  const client = new MockDiscordClient();
+  const modelInstance = {
+    id: 'model-test',
+    completeSimple: async () => ({
+      content: [{ type: 'text', text: 'ok' }],
+    })
+  };
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jevons-runtime-debug-log-default-'));
+  const debugLogPath = path.join(tempDir, 'agent_debug.log');
+
+  try {
+    await createDiscordRuntime({
+      client,
+      token: 'token-123',
+      channelId: 'root',
+      modelInstance,
+      sendMessage: () => Promise.resolve(),
+      agentDebugLogPath: debugLogPath,
+      deps: { Agent: MockAgent }
+    });
+
+    client.emit('messageCreate', makeMessage({ channelId: 'root', content: 'One', messageId: 'm1' }));
+    await flush(200);
+    client.emit('messageCreate', makeMessage({ channelId: 'root', content: 'Two', messageId: 'm2' }));
+    await flush(200);
+    client.emit('messageCreate', makeMessage({ channelId: 'root', content: 'Three', messageId: 'm3' }));
+    await flush(200);
+    client.emit('messageCreate', makeMessage({ channelId: 'root', content: 'Four', messageId: 'm4' }));
+    await flush(200);
+
+    const interactions = readDebugInteractions(debugLogPath);
+    assert.equal(interactions.length, 3);
+    assert.ok(interactions[0].userPrompt.content.includes('Two'));
+    assert.ok(interactions[2].userPrompt.content.includes('Four'));
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }

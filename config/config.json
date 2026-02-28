@@ -36,6 +36,14 @@
     {
       "provider": "opencode",
       "model": "gpt-5-nano"
+    },
+    {
+      "provider": "openai-codex",
+      "model": "0"
+    },
+    {
+      "provider": "openai-codex",
+      "model": "gpt-5.2"
     }
   ],
   "reminders": {
@@ -43,5 +51,8 @@
     "timezone": "Europe/London",
     "user_id": "120638630254346240"
   },
-  "sessionDir": "./identity/memory"
+  "sessionDir": "/home/simon/jevons/memory",
+  "debug": {
+    "agentLogInteractions": 3
+  }
 }
