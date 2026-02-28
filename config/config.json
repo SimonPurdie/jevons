@@ -39,10 +39,6 @@
     },
     {
       "provider": "openai-codex",
-      "model": "0"
-    },
-    {
-      "provider": "openai-codex",
       "model": "gpt-5.2"
     }
   ],
@@ -51,7 +47,7 @@
     "timezone": "Europe/London",
     "user_id": "120638630254346240"
   },
-  "sessionDir": "/home/simon/jevons/memory",
+  "sessionDir": "/home/simon/projects/jevons/identity/memory",
   "debug": {
     "agentLogInteractions": 3
   }
