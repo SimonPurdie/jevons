@@ -59,6 +59,19 @@ test('loadConfig applies environment overrides', () => {
   assert.equal(config.activeModel, 'coding');
 });
 
+test('loadConfig does not override sessionDir from environment', () => {
+  const dir = makeTempDir();
+  const data = {
+    sessionDir: '/tmp/from-config',
+  };
+  writeConfig(dir, data);
+  const env = {
+    JEVONS_SESSION_DIR: '/tmp/from-env',
+  };
+  const config = loadConfig({ cwd: dir, env });
+  assert.equal(config.sessionDir, '/tmp/from-config');
+});
+
 test('loadConfig applies agent debug interaction limit override', () => {
   const dir = makeTempDir();
   writeConfig(dir, {});

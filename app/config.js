@@ -8,7 +8,6 @@ const ENV_MAP = {
   JEVONS_REMINDERS_FILE_PATH: ['reminders', 'file_path'],
   JEVONS_REMINDERS_TIMEZONE: ['reminders', 'timezone'],
   JEVONS_ACTIVE_MODEL: ['activeModel'],
-  JEVONS_SESSION_DIR: ['sessionDir'],
   JEVONS_AGENT_DEBUG_INTERACTIONS: ['debug', 'agentLogInteractions'],
 };
 
