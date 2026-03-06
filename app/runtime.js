@@ -13,6 +13,9 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_AGENT_DEBUG_INTERACTION_LIMIT = 3;
+const THINKING_LEVELS = new Set(['off', 'minimal', 'low', 'medium', 'high', 'xhigh']);
+const DEFAULT_THINKING_LEVEL = 'off';
+
 
 function normalizeAgentDebugInteractionLimit(value) {
   const parsed = Number.parseInt(value, 10);
@@ -20,6 +23,24 @@ function normalizeAgentDebugInteractionLimit(value) {
     return DEFAULT_AGENT_DEBUG_INTERACTION_LIMIT;
   }
   return parsed;
+}
+
+function normalizeThinkingLevel(value) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) {
+    return null;
+  }
+  return THINKING_LEVELS.has(normalized) ? normalized : null;
+}
+
+function formatThinkingLevel(value) {
+  if (!value) {
+    return DEFAULT_THINKING_LEVEL;
+  }
+  return value;
 }
 
 function parseAgentDebugInteractions(raw) {
@@ -441,13 +462,18 @@ export async function generateReply(payload, modelInstance, options = {}) {
   const systemPrompt = buildSystemPrompt(options.skills, workspaceFilesContent, workspaceFilesBaseDir);
   const historyMessages = normalizeHistoryMessages(sessionContext.messages || [], modelInstance);
 
+  const initialState = {
+    systemPrompt,
+    model: modelInstance,
+    tools: Array.isArray(options.tools) ? options.tools : [],
+    messages: historyMessages,
+  };
+  if (options.thinkingLevel !== undefined && options.thinkingLevel !== null) {
+    initialState.thinkingLevel = options.thinkingLevel;
+  }
+
   const agent = new AgentClass({
-    initialState: {
-      systemPrompt,
-      model: modelInstance,
-      tools: Array.isArray(options.tools) ? options.tools : [],
-      messages: historyMessages,
-    },
+    initialState,
     getApiKey: async (provider) => {
       if (options.authStorage) {
         const key = await options.authStorage.getApiKey(provider);
@@ -568,6 +594,7 @@ export async function createDiscordRuntime(options) {
     skillsDir,
     ipcPort,
     configPath,
+    thinkingLevel,
     agentDebugInteractionLimit: configuredAgentDebugInteractionLimit,
     agentDebugLogPath,
     deps = {},
@@ -632,6 +659,10 @@ export async function createDiscordRuntime(options) {
   let runtimeModels = normalizeModels(models);
   let runtimeActiveModel = typeof activeModel === 'string' ? activeModel : null;
   let resolvedModel = modelInstance;
+  let runtimeThinkingLevel = normalizeThinkingLevel(thinkingLevel);
+  if (!runtimeThinkingLevel && typeof thinkingLevel === 'string' && thinkingLevel.trim()) {
+    console.warn('Invalid thinking level "' + thinkingLevel + '"; defaulting to "' + DEFAULT_THINKING_LEVEL + '".');
+  }
 
   async function resolveModelById(modelId) {
     if (typeof modelId !== 'string' || !modelId.includes('/')) {
@@ -652,6 +683,12 @@ export async function createDiscordRuntime(options) {
     const diskConfig = readConfigFile(effectiveConfigPath);
     diskConfig.activeModel = nextActiveModel;
     diskConfig.models = nextModels;
+    saveConfig(diskConfig, { configPath: effectiveConfigPath });
+  }
+
+  async function persistThinkingLevel(nextThinkingLevel) {
+    const diskConfig = readConfigFile(effectiveConfigPath);
+    diskConfig.thinkingLevel = nextThinkingLevel || DEFAULT_THINKING_LEVEL;
     saveConfig(diskConfig, { configPath: effectiveConfigPath });
   }
 
@@ -805,6 +842,49 @@ export async function createDiscordRuntime(options) {
             try {
               await payload.interaction.reply('Failed to list sessions. Please try again.');
             } catch (replyErr) {
+              // Ignore secondary errors
+            }
+          }
+          return;
+        }
+
+        if (payload.commandName === 'thinking') {
+          try {
+            const levelInput = payload.interaction.options?.getString('level');
+            if (!levelInput) {
+              const currentLevel = formatThinkingLevel(runtimeThinkingLevel);
+              await payload.interaction.reply({
+                content: 'Current thinking level is `' + currentLevel + '`.',
+                ephemeral: true,
+              });
+              return;
+            }
+
+            const normalizedLevel = normalizeThinkingLevel(levelInput);
+            if (!normalizedLevel) {
+              await payload.interaction.reply({
+                content: 'Unknown thinking level `' + levelInput + '`. Allowed: off, minimal, low, medium, high, xhigh.',
+                ephemeral: true,
+              });
+              return;
+            }
+
+            runtimeThinkingLevel = normalizedLevel;
+            await persistThinkingLevel(runtimeThinkingLevel);
+            await payload.interaction.reply({
+              content: 'Thinking level set to `' + runtimeThinkingLevel + '`.',
+              ephemeral: true,
+            });
+          } catch (err) {
+            if (typeof onError === 'function') {
+              onError(err);
+            }
+            try {
+              await payload.interaction.reply({
+                content: 'Failed to update thinking level: ' + err.message,
+                ephemeral: true,
+              });
+            } catch (_replyErr) {
               // Ignore secondary errors
             }
           }
@@ -1360,6 +1440,7 @@ export async function createDiscordRuntime(options) {
             artifacts: pendingArtifacts,
             agentDebugInteractionLimit,
             agentDebugLogPath,
+            thinkingLevel: runtimeThinkingLevel,
           });
 
           if (reply && (typeof reply.content === 'string' || (Array.isArray(reply.files) && reply.files.length > 0))) {

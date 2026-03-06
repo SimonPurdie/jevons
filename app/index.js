@@ -78,6 +78,7 @@ export async function startDiscordRuntime(deps = {}) {
     applicationId: discordConfig.application_id,
     activeModel: config.activeModel,
     models: config.models,
+    thinkingLevel: config.thinkingLevel,
     authStorage,
     skillsDir: path.join(__dirname, '../skills'),
     sessionDir: getSessionDir(config),

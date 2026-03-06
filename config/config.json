@@ -3,7 +3,7 @@
     "channel_id": "1466871283160449155",
     "application_id": "1465731621196927210"
   },
-  "activeModel": "openai-codex/gpt-5.4",
+  "activeModel": "openai-codex/gpt-5.2-codex",
   "models": [
     {
       "provider": "google",
@@ -43,7 +43,7 @@
     },
     {
       "provider": "openai-codex",
-      "model": "gpt-5.4"
+      "model": "gpt-5.2-codex"
     }
   ],
   "reminders": {
@@ -54,5 +54,6 @@
   "sessionDir": "/home/simon/projects/jevons/identity/memory",
   "debug": {
     "agentLogInteractions": 3
-  }
+  },
+  "thinkingLevel": "high"
 }

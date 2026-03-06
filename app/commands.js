@@ -23,6 +23,21 @@ export function getCommandDefinitions() {
             .setName('fork')
             .setDescription('Branch conversation from an earlier message'),
         new SlashCommandBuilder()
+            .setName('thinking')
+            .setDescription('Get or set the global thinking level')
+            .addStringOption(option =>
+                option.setName('level')
+                    .setDescription('Thinking level to apply')
+                    .setRequired(false)
+                    .addChoices(
+                        { name: 'off', value: 'off' },
+                        { name: 'minimal', value: 'minimal' },
+                        { name: 'low', value: 'low' },
+                        { name: 'medium', value: 'medium' },
+                        { name: 'high', value: 'high' },
+                        { name: 'xhigh', value: 'xhigh' },
+                    )),
+        new SlashCommandBuilder()
             .setName('model')
             .setDescription('List, add, and switch active model')
             .addStringOption(option =>
