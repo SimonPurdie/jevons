@@ -10,6 +10,7 @@
 - `SessionManager.createBranchedSession(entryId)` returns a **string** containing the absolute path to the new session file, NOT a `SessionManager` instance. You must call `SessionManager.open(path)` on the returned string to get a manager for the new branched session.
 - `sessionManager.buildSessionContext().messages` returns model-ready message objects without the internal `id` fields. To get messages with their entry IDs (e.g., for forking), use `sessionManager.getBranch()` which returns raw entries containing `id`, `type`, `timestamp`, and `message` properties.
 - **Session Persistence**: `SessionManager` from `pi-coding-agent` only flushes to disk once the first **assistant** message is appended. User-only sessions remain in memory only. The migration script and tests now reflect this behavior.
+- In `pi-coding-agent` `0.56.x`, `AuthStorage` constructor no longer accepts a plain auth file path string. Use `AuthStorage.create(authPath)` or `new AuthStorage(new FileAuthStorageBackend(authPath))`. Passing a string causes silent auth-load failure (e.g., missing Discord token despite `config/auth.json` containing it).
 
 **Sandbox Test Limitation**
 - In restricted/sandboxed environments, tests that open local listeners may fail with `listen EPERM: operation not permitted 127.0.0.1` (observed in `test/app/e2e_history.test.js` and `test/app/logging_integration.test.js`). Run those in an environment that permits loopback binds.

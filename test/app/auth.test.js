@@ -44,7 +44,6 @@ describe('auth', () => {
       assert.strictEqual(typeof auth.hasAuth, 'function');
       assert.strictEqual(typeof auth.setRuntimeApiKey, 'function');
       assert.strictEqual(typeof auth.reload, 'function');
-      assert.strictEqual(typeof auth.save, 'function');
     });
 
     describe('API key from file (api_key type)', () => {

@@ -3,7 +3,7 @@
     "channel_id": "1466871283160449155",
     "application_id": "1465731621196927210"
   },
-  "activeModel": "openai-codex/gpt-5.2-codex",
+  "activeModel": "openai-codex/gpt-5.3-codex",
   "models": [
     {
       "provider": "google",

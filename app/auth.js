@@ -1,5 +1,9 @@
 import path from 'path';
-import { AuthStorage as PiAuthStorage } from '@mariozechner/pi-coding-agent';
+import { AuthStorage as PiAuthStorage, FileAuthStorageBackend } from '@mariozechner/pi-coding-agent';
+
+function getDefaultAuthPath() {
+    return path.join(process.cwd(), 'config', 'auth.json');
+}
 
 /**
  * AuthStorage with Jevons' path convention.
@@ -7,8 +11,7 @@ import { AuthStorage as PiAuthStorage } from '@mariozechner/pi-coding-agent';
  */
 export class AuthStorage extends PiAuthStorage {
     constructor(authPath) {
-        const defaultPath = path.join(process.cwd(), 'config', 'auth.json');
-        super(authPath || defaultPath);
+        super(new FileAuthStorageBackend(authPath || getDefaultAuthPath()));
     }
 }
 
