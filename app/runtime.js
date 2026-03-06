@@ -311,12 +311,42 @@ function formatTimeAgo(date) {
   }
 }
 
-const MODEL_SELECT_MENU_PREFIX = 'model_switch_select';
-const MODELS_PER_PAGE = 23;
+const MODEL_PROVIDER_SELECT_MENU_PREFIX = 'model_provider_select';
+const MODEL_MODEL_SELECT_MENU_PREFIX = 'model_model_select';
+const PROVIDERS_PER_PAGE = 23;
+const MODELS_PER_PAGE = 22;
+const MAX_RECENT_OPTIONS = 5;
 
 function truncateForDiscord(value, max = 100) {
   const text = typeof value === 'string' ? value : '';
   return text.length > max ? `${text.slice(0, max - 3)}...` : text;
+}
+
+function compareModelEntries(a, b) {
+  if (!a || !b) {
+    return 0;
+  }
+  const providerDiff = a.provider.localeCompare(b.provider);
+  if (providerDiff !== 0) {
+    return providerDiff;
+  }
+  return a.model.localeCompare(b.model);
+}
+
+function parseModelId(modelId) {
+  if (typeof modelId !== 'string') {
+    return null;
+  }
+  const firstSlash = modelId.indexOf('/');
+  if (firstSlash <= 0 || firstSlash >= modelId.length - 1) {
+    return null;
+  }
+  const provider = modelId.slice(0, firstSlash).trim();
+  const model = modelId.slice(firstSlash + 1).trim();
+  if (!provider || !model) {
+    return null;
+  }
+  return { provider, model };
 }
 
 function toModelId(modelEntry) {
@@ -339,48 +369,181 @@ function normalizeModels(models) {
     return [];
   }
   const normalized = [];
+  const seen = new Set();
   for (const entry of models) {
     const id = toModelId(entry);
-    if (!id) continue;
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
     const firstSlash = id.indexOf('/');
     const provider = id.slice(0, firstSlash);
     const model = id.slice(firstSlash + 1);
     normalized.push({ provider, model });
   }
+  normalized.sort(compareModelEntries);
   return normalized;
 }
 
-function parseModelSelectCustomId(customId) {
-  if (typeof customId !== 'string' || !customId.startsWith(`${MODEL_SELECT_MENU_PREFIX}:`)) {
+function normalizeRecentOptions(items, maxItems = MAX_RECENT_OPTIONS) {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+  const normalized = [];
+  const seen = new Set();
+  for (const item of items) {
+    if (typeof item !== 'string') {
+      continue;
+    }
+    const value = item.trim();
+    if (!value || seen.has(value)) {
+      continue;
+    }
+    seen.add(value);
+    normalized.push(value);
+    if (normalized.length >= maxItems) {
+      break;
+    }
+  }
+  return normalized;
+}
+
+function normalizeRecentModelsByProvider(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+  const normalized = {};
+  for (const [provider, models] of Object.entries(value)) {
+    if (typeof provider !== 'string' || !provider.trim()) {
+      continue;
+    }
+    const recentModels = normalizeRecentOptions(models);
+    if (recentModels.length > 0) {
+      normalized[provider.trim()] = recentModels;
+    }
+  }
+  return normalized;
+}
+
+function prioritizeWithRecents(values, recentValues) {
+  const uniqueValues = [];
+  const seen = new Set();
+  for (const raw of values || []) {
+    if (typeof raw !== 'string') {
+      continue;
+    }
+    const value = raw.trim();
+    if (!value || seen.has(value)) {
+      continue;
+    }
+    seen.add(value);
+    uniqueValues.push(value);
+  }
+
+  uniqueValues.sort((a, b) => a.localeCompare(b));
+
+  const recentList = normalizeRecentOptions(recentValues).filter((value) => seen.has(value));
+  const recentSet = new Set(recentList);
+  const remaining = uniqueValues.filter((value) => !recentSet.has(value));
+
+  return [...recentList, ...remaining];
+}
+
+function getProviderIdsFromModelCatalog(modelEntries) {
+  const providers = [];
+  const seen = new Set();
+  for (const entry of modelEntries || []) {
+    if (!entry || typeof entry.provider !== 'string') {
+      continue;
+    }
+    const provider = entry.provider.trim();
+    if (!provider || seen.has(provider)) {
+      continue;
+    }
+    seen.add(provider);
+    providers.push(provider);
+  }
+  return providers;
+}
+
+function getModelsForProviderFromModelCatalog(modelEntries, provider) {
+  const providerId = typeof provider === 'string' ? provider.trim() : '';
+  if (!providerId) {
+    return [];
+  }
+
+  const models = [];
+  const seen = new Set();
+  for (const entry of modelEntries || []) {
+    if (!entry || entry.provider !== providerId || typeof entry.model !== 'string') {
+      continue;
+    }
+    const model = entry.model.trim();
+    if (!model || seen.has(model)) {
+      continue;
+    }
+    seen.add(model);
+    models.push(model);
+  }
+  return models;
+}
+
+function parseProviderSelectCustomId(customId) {
+  if (typeof customId !== 'string' || !customId.startsWith(`${MODEL_PROVIDER_SELECT_MENU_PREFIX}:`)) {
     return null;
   }
-  const raw = customId.slice(`${MODEL_SELECT_MENU_PREFIX}:`.length);
+  const raw = customId.slice(`${MODEL_PROVIDER_SELECT_MENU_PREFIX}:`.length);
   const page = Number.parseInt(raw, 10);
   return Number.isFinite(page) ? page : 0;
 }
 
-function createModelMenuView(models, activeModel, requestedPage = 0, contentPrefix = '') {
-  const safeModels = normalizeModels(models);
-  if (safeModels.length === 0) {
+function parseProviderModelSelectCustomId(customId) {
+  if (typeof customId !== 'string' || !customId.startsWith(`${MODEL_MODEL_SELECT_MENU_PREFIX}:`)) {
+    return null;
+  }
+  const raw = customId.slice(`${MODEL_MODEL_SELECT_MENU_PREFIX}:`.length);
+  const separatorIndex = raw.lastIndexOf(':');
+  if (separatorIndex <= 0 || separatorIndex >= raw.length - 1) {
+    return null;
+  }
+  const encodedProvider = raw.slice(0, separatorIndex);
+  const pageRaw = raw.slice(separatorIndex + 1);
+  const page = Number.parseInt(pageRaw, 10);
+  if (!Number.isFinite(page)) {
+    return null;
+  }
+  let provider;
+  try {
+    provider = decodeURIComponent(encodedProvider);
+  } catch (_err) {
+    return null;
+  }
+  if (!provider) {
+    return null;
+  }
+  return { provider, page };
+}
+
+function createProviderMenuView(providers, activeModel, requestedPage = 0, contentPrefix = '') {
+  const safeProviders = Array.isArray(providers) ? providers : [];
+  if (safeProviders.length === 0) {
+    const prefix = contentPrefix ? `${contentPrefix}\n` : '';
     return {
-      content: `${contentPrefix}No models configured. Add one with \`/model provider:<provider> model:<model>\`.`,
+      content: `${prefix}No providers available from Pi model registry.`,
       components: [],
     };
   }
 
-  const totalPages = Math.max(1, Math.ceil(safeModels.length / MODELS_PER_PAGE));
+  const totalPages = Math.max(1, Math.ceil(safeProviders.length / PROVIDERS_PER_PAGE));
   const page = Math.max(0, Math.min(requestedPage, totalPages - 1));
-  const start = page * MODELS_PER_PAGE;
-  const pageItems = safeModels.slice(start, start + MODELS_PER_PAGE);
+  const start = page * PROVIDERS_PER_PAGE;
+  const pageItems = safeProviders.slice(start, start + PROVIDERS_PER_PAGE);
 
-  const options = pageItems.map((entry, offset) => {
+  const options = pageItems.map((provider, offset) => {
     const absoluteIndex = start + offset;
-    const id = `${entry.provider}/${entry.model}`;
-    const isActive = id === activeModel;
+    const isActive = typeof activeModel === 'string' && activeModel.startsWith(`${provider}/`);
     return {
-      label: truncateForDiscord(isActive ? `${id} (active)` : id),
-      description: truncateForDiscord(`Provider: ${entry.provider}`),
-      value: `set:${absoluteIndex}`,
+      label: truncateForDiscord(isActive ? `${provider} (active)` : provider),
+      description: isActive ? 'Contains active model' : 'Select provider',
+      value: `provider:set:${absoluteIndex}`,
     };
   });
 
@@ -389,28 +552,95 @@ function createModelMenuView(models, activeModel, requestedPage = 0, contentPref
       options.push({
         label: 'Previous page',
         description: `Page ${page} of ${totalPages}`,
-        value: 'nav:prev',
+        value: 'provider:nav:prev',
       });
     }
     if (page < totalPages - 1) {
       options.push({
         label: 'Next page',
         description: `Page ${page + 2} of ${totalPages}`,
-        value: 'nav:next',
+        value: 'provider:nav:next',
       });
     }
   }
 
   const selectMenu = new StringSelectMenuBuilder()
-    .setCustomId(`${MODEL_SELECT_MENU_PREFIX}:${page}`)
-    .setPlaceholder('Choose a model or change page')
+    .setCustomId(`${MODEL_PROVIDER_SELECT_MENU_PREFIX}:${page}`)
+    .setPlaceholder('Choose a provider')
     .addOptions(options);
 
   const row = new ActionRowBuilder().addComponents(selectMenu);
   const prefix = contentPrefix ? `${contentPrefix}\n` : '';
 
   return {
-    content: `${prefix}Active model: \`${activeModel || 'None'}\`\nModels: ${safeModels.length} (page ${page + 1}/${totalPages})`,
+    content: `${prefix}Active model: \`${activeModel || 'None'}\`\nProviders: ${safeProviders.length} (page ${page + 1}/${totalPages})`,
+    components: [row],
+  };
+}
+
+function createProviderModelMenuView(provider, models, activeModel, requestedPage = 0, contentPrefix = '') {
+  const safeProvider = typeof provider === 'string' ? provider.trim() : '';
+  const safeModels = Array.isArray(models) ? models : [];
+  if (!safeProvider) {
+    return {
+      content: 'Invalid provider selection.',
+      components: [],
+    };
+  }
+
+  const totalPages = Math.max(1, Math.ceil(Math.max(safeModels.length, 1) / MODELS_PER_PAGE));
+  const page = Math.max(0, Math.min(requestedPage, totalPages - 1));
+  const start = page * MODELS_PER_PAGE;
+  const pageItems = safeModels.slice(start, start + MODELS_PER_PAGE);
+
+  const options = pageItems.map((modelId, offset) => {
+    const absoluteIndex = start + offset;
+    const id = `${safeProvider}/${modelId}`;
+    const isActive = id === activeModel;
+    return {
+      label: truncateForDiscord(isActive ? `${modelId} (active)` : modelId),
+      description: isActive ? 'Currently active model' : truncateForDiscord(`Provider: ${safeProvider}`),
+      value: `model:set:${absoluteIndex}`,
+    };
+  });
+
+  if (totalPages > 1) {
+    if (page > 0) {
+      options.push({
+        label: 'Previous page',
+        description: `Page ${page} of ${totalPages}`,
+        value: 'model:nav:prev',
+      });
+    }
+    if (page < totalPages - 1) {
+      options.push({
+        label: 'Next page',
+        description: `Page ${page + 2} of ${totalPages}`,
+        value: 'model:nav:next',
+      });
+    }
+  }
+
+  options.push({
+    label: 'Change provider',
+    description: 'Return to provider list',
+    value: 'model:back',
+  });
+
+  const encodedProvider = encodeURIComponent(safeProvider);
+  const selectMenu = new StringSelectMenuBuilder()
+    .setCustomId(`${MODEL_MODEL_SELECT_MENU_PREFIX}:${encodedProvider}:${page}`)
+    .setPlaceholder(truncateForDiscord(`Choose model for ${safeProvider}`, 100))
+    .addOptions(options);
+
+  const row = new ActionRowBuilder().addComponents(selectMenu);
+  const prefix = contentPrefix ? `${contentPrefix}\n` : '';
+  const body = safeModels.length === 0
+    ? `Provider: \`${safeProvider}\`\nNo models available for this provider.`
+    : `Provider: \`${safeProvider}\`\nModels: ${safeModels.length} (page ${page + 1}/${totalPages})`;
+
+  return {
+    content: `${prefix}Active model: \`${activeModel || 'None'}\`\n${body}`,
     components: [row],
   };
 }
@@ -583,7 +813,6 @@ export async function createDiscordRuntime(options) {
     channelId,
     applicationId,
     activeModel,
-    models,
     providers,
     modelInstance,
     getModel: getModelOverride,
@@ -656,12 +885,74 @@ export async function createDiscordRuntime(options) {
   }
 
   const effectiveConfigPath = configPath || path.join(process.cwd(), 'config', 'config.json');
-  let runtimeModels = normalizeModels(models);
   let runtimeActiveModel = typeof activeModel === 'string' ? activeModel : null;
+  let runtimeModels = [];
+  if (runtimeActiveModel) {
+    const parsedActiveModel = parseModelId(runtimeActiveModel);
+    if (parsedActiveModel) runtimeModels = [parsedActiveModel];
+  }
   let resolvedModel = modelInstance;
   let runtimeThinkingLevel = normalizeThinkingLevel(thinkingLevel);
   if (!runtimeThinkingLevel && typeof thinkingLevel === 'string' && thinkingLevel.trim()) {
     console.warn('Invalid thinking level "' + thinkingLevel + '"; defaulting to "' + DEFAULT_THINKING_LEVEL + '".');
+  }
+
+  function loadModelPickerRecents() {
+    const diskConfig = readConfigFile(effectiveConfigPath);
+    const modelPicker = diskConfig?.modelPicker;
+    return {
+      recentProviders: normalizeRecentOptions(modelPicker?.recentProviders),
+      recentModelsByProvider: normalizeRecentModelsByProvider(modelPicker?.recentModelsByProvider),
+    };
+  }
+
+  let modelPickerRecents = loadModelPickerRecents();
+
+  function getOrderedProviders() {
+    const providersFromCatalog = getProviderIdsFromModelCatalog(runtimeModels);
+    return prioritizeWithRecents(providersFromCatalog, modelPickerRecents.recentProviders);
+  }
+
+  function getOrderedModelsForProvider(provider) {
+    const modelsFromCatalog = getModelsForProviderFromModelCatalog(runtimeModels, provider);
+    const recentModels = modelPickerRecents.recentModelsByProvider?.[provider] || [];
+    return prioritizeWithRecents(modelsFromCatalog, recentModels);
+  }
+
+  function markRecentProvider(provider) {
+    const providerId = typeof provider === 'string' ? provider.trim() : '';
+    if (!providerId) {
+      return;
+    }
+    modelPickerRecents = {
+      ...modelPickerRecents,
+      recentProviders: normalizeRecentOptions([providerId, ...modelPickerRecents.recentProviders]),
+    };
+  }
+
+  function markRecentModel(provider, modelId) {
+    const providerId = typeof provider === 'string' ? provider.trim() : '';
+    const model = typeof modelId === 'string' ? modelId.trim() : '';
+    if (!providerId || !model) {
+      return;
+    }
+    const providerRecentModels = modelPickerRecents.recentModelsByProvider?.[providerId] || [];
+    modelPickerRecents = {
+      ...modelPickerRecents,
+      recentModelsByProvider: {
+        ...modelPickerRecents.recentModelsByProvider,
+        [providerId]: normalizeRecentOptions([model, ...providerRecentModels]),
+      },
+    };
+  }
+
+  async function persistModelPickerRecents() {
+    const diskConfig = readConfigFile(effectiveConfigPath);
+    diskConfig.modelPicker = {
+      recentProviders: normalizeRecentOptions(modelPickerRecents.recentProviders),
+      recentModelsByProvider: normalizeRecentModelsByProvider(modelPickerRecents.recentModelsByProvider),
+    };
+    saveConfig(diskConfig, { configPath: effectiveConfigPath });
   }
 
   async function resolveModelById(modelId) {
@@ -679,10 +970,89 @@ export async function createDiscordRuntime(options) {
     return getModelFn(provider, modelName, providers) || null;
   }
 
-  async function persistModelSettings(nextActiveModel, nextModels) {
+  async function refreshRuntimeModelsFromPi() {
+    const piAi = await _resolvePiAi();
+    if (typeof piAi.getProviders !== 'function' || typeof piAi.getModels !== 'function') {
+      return runtimeModels;
+    }
+
+    const catalog = [];
+    const seen = new Set();
+    const providerIds = piAi.getProviders();
+    if (!Array.isArray(providerIds)) {
+      return runtimeModels;
+    }
+    for (const providerEntry of providerIds) {
+      if (typeof providerEntry !== 'string' || !providerEntry.trim()) {
+        continue;
+      }
+      const provider = providerEntry.trim();
+      let modelsForProvider = [];
+      try {
+        modelsForProvider = piAi.getModels(provider);
+      } catch (_err) {
+        continue;
+      }
+      if (!Array.isArray(modelsForProvider)) {
+        continue;
+      }
+      for (const modelEntry of modelsForProvider) {
+        const modelId = typeof modelEntry === 'string'
+          ? modelEntry.trim()
+          : typeof modelEntry?.id === 'string'
+            ? modelEntry.id.trim()
+            : '';
+        const modelProvider = typeof modelEntry?.provider === 'string' && modelEntry.provider.trim()
+          ? modelEntry.provider.trim()
+          : provider;
+        if (!modelId || !modelProvider) {
+          continue;
+        }
+        const key = `${modelProvider}/${modelId}`;
+        if (seen.has(key)) {
+          continue;
+        }
+        seen.add(key);
+        catalog.push({ provider: modelProvider, model: modelId });
+      }
+    }
+
+    if (catalog.length > 0) {
+      runtimeModels = normalizeModels(catalog);
+    }
+
+    if (runtimeActiveModel && !runtimeModels.some((entry) => toModelId(entry) === runtimeActiveModel)) {
+      const parsedActiveModel = parseModelId(runtimeActiveModel);
+      if (parsedActiveModel) {
+        runtimeModels = normalizeModels([...runtimeModels, parsedActiveModel]);
+      }
+    }
+
+    return runtimeModels;
+  }
+
+  async function getUnknownModelMessage(modelId) {
+    const parsed = parseModelId(modelId);
+    if (!parsed) {
+      return `Model "${modelId}" must be in provider/model format.`;
+    }
+
+    const piAi = await _resolvePiAi();
+    const getModelsFn = piAi.getModels;
+    const available = typeof getModelsFn === 'function' ? getModelsFn(parsed.provider) : [];
+    const names = available
+      .map((entry) => (typeof entry === 'string' ? entry : entry?.id))
+      .filter((value) => typeof value === 'string' && value.trim())
+      .map((value) => value.trim());
+    const preview = names.slice(0, 10).join(', ');
+    const suffix = names.length > 10 ? '…' : '';
+    const availableText = preview ? `${preview}${suffix}` : '(none reported by Pi)';
+    return `Unknown model "${parsed.model}" for provider "${parsed.provider}". Available: ${availableText}`;
+  }
+
+  async function persistActiveModel(nextActiveModel) {
     const diskConfig = readConfigFile(effectiveConfigPath);
     diskConfig.activeModel = nextActiveModel;
-    diskConfig.models = nextModels;
     saveConfig(diskConfig, { configPath: effectiveConfigPath });
   }
 
@@ -692,9 +1062,8 @@ export async function createDiscordRuntime(options) {
     saveConfig(diskConfig, { configPath: effectiveConfigPath });
   }
 
-  async function switchActiveModel(nextModelId, nextModels) {
-    await persistModelSettings(nextModelId, nextModels);
-    runtimeModels = normalizeModels(nextModels);
+  async function switchActiveModel(nextModelId) {
+    await persistActiveModel(nextModelId);
     runtimeActiveModel = nextModelId;
 
     try {
@@ -703,36 +1072,28 @@ export async function createDiscordRuntime(options) {
         resolvedModel = model;
         return { switchedInRuntime: true };
       }
-      return { switchedInRuntime: false, warning: 'Model saved, but runtime could not resolve it immediately.' };
+      return { switchedInRuntime: false, warning: 'Model selection was saved, but runtime could not resolve it immediately.' };
     } catch (err) {
-      return { switchedInRuntime: false, warning: `Model saved, but runtime switch failed: ${err.message}` };
+      return { switchedInRuntime: false, warning: `Model selection was saved, but runtime switch failed: ${err.message}` };
     }
+  }
+
+  try {
+    await refreshRuntimeModelsFromPi();
+  } catch (_err) {
+    // Keep runtime model list as-is if Pi catalog lookup is unavailable.
   }
 
   if (!resolvedModel) {
     let targetModelId = runtimeActiveModel;
-    if ((!targetModelId || !targetModelId.includes('/')) && runtimeModels.length > 0) {
-      targetModelId = toModelId(runtimeModels[0]);
-      runtimeActiveModel = targetModelId;
-    }
-
-    if (!targetModelId) {
-      const configDebug = { activeModel, modelsLength: Array.isArray(models) ? models.length : 0 };
-      throw new Error(`No active model configuration found or activeModel format invalid. Please check config.json. Debug: ${JSON.stringify(configDebug)}`);
+    if (!targetModelId || !targetModelId.includes('/')) {
+      throw new Error('No active model configuration found or activeModel format is invalid. Please check config.json.');
     }
 
     const model = await resolveModelById(targetModelId);
     if (!model) {
-      const firstSlash = targetModelId.indexOf('/');
-      const targetProvider = targetModelId.slice(0, firstSlash);
-      const targetModel = targetModelId.slice(firstSlash + 1);
-      const piAi = await _resolvePiAi();
-      const getModelsFn = piAi.getModels;
-      const available = typeof getModelsFn === 'function' ? getModelsFn(targetProvider) : [];
-      const names = available.map((entry) => entry.id || entry);
-      const preview = names.slice(0, 10).join(', ');
-      const suffix = names.length > 10 ? '…' : '';
-      throw new Error(`Unknown model "${targetModel}" for provider "${targetProvider}". Available: ${preview}${suffix}`);
+      const unknownModelMessage = await getUnknownModelMessage(targetModelId);
+      throw new Error(unknownModelMessage);
     }
     resolvedModel = model;
   }
@@ -893,49 +1254,18 @@ export async function createDiscordRuntime(options) {
 
         if (payload.commandName === 'model') {
           try {
-            const providerInput = payload.interaction.options?.getString('provider');
-            const modelInput = payload.interaction.options?.getString('model');
-
-            if ((providerInput && !modelInput) || (!providerInput && modelInput)) {
-              await payload.interaction.reply({
-                content: 'Provide both `provider` and `model`, or omit both to list models.',
-                ephemeral: true,
-              });
-              return;
+            try {
+              await refreshRuntimeModelsFromPi();
+            } catch (_err) {
+              // Keep last known runtime models if Pi catalog lookup fails.
             }
 
-            if (providerInput && modelInput) {
-              const provider = providerInput.trim();
-              const modelName = modelInput.trim();
-              if (!provider || !modelName) {
-                await payload.interaction.reply({
-                  content: 'Provider and model must be non-empty strings.',
-                  ephemeral: true,
-                });
-                return;
-              }
+            const providers = getOrderedProviders();
+            const activeProvider = parseModelId(runtimeActiveModel)?.provider || '';
+            const activeProviderIndex = activeProvider ? providers.indexOf(activeProvider) : -1;
+            const initialPage = activeProviderIndex >= 0 ? Math.floor(activeProviderIndex / PROVIDERS_PER_PAGE) : 0;
 
-              const selectedId = `${provider}/${modelName}`;
-              const nextModels = [...runtimeModels];
-              const exists = nextModels.some((entry) => toModelId(entry) === selectedId);
-              if (!exists) {
-                nextModels.push({ provider, model: modelName });
-              }
-
-              const switchResult = await switchActiveModel(selectedId, nextModels);
-              const selectedIndex = nextModels.findIndex((entry) => toModelId(entry) === selectedId);
-              const selectedPage = selectedIndex >= 0 ? Math.floor(selectedIndex / MODELS_PER_PAGE) : 0;
-              const status = exists ? 'Switched active model.' : 'Added model and switched active model.';
-              const warning = switchResult.warning ? `\n${switchResult.warning}` : '';
-              const view = createModelMenuView(nextModels, runtimeActiveModel, selectedPage, `${status}${warning}`);
-              await payload.interaction.reply({
-                ...view,
-                ephemeral: true,
-              });
-              return;
-            }
-
-            const view = createModelMenuView(runtimeModels, runtimeActiveModel, 0);
+            const view = createProviderMenuView(providers, runtimeActiveModel, initialPage);
             await payload.interaction.reply({
               ...view,
               ephemeral: true,
@@ -956,43 +1286,151 @@ export async function createDiscordRuntime(options) {
           return;
         }
 
-        if (payload.isSelectMenu && typeof payload.customId === 'string' && payload.customId.startsWith(`${MODEL_SELECT_MENU_PREFIX}:`)) {
+        if (
+          payload.isSelectMenu &&
+          typeof payload.customId === 'string' &&
+          payload.customId.startsWith(`${MODEL_PROVIDER_SELECT_MENU_PREFIX}:`)
+        ) {
           try {
-            const currentPage = parseModelSelectCustomId(payload.customId) || 0;
+            try {
+              await refreshRuntimeModelsFromPi();
+            } catch (_err) {
+              // Keep last known runtime models if Pi catalog lookup fails.
+            }
+
+            const currentPage = parseProviderSelectCustomId(payload.customId) || 0;
             const selectedValue = payload.values && payload.values[0] ? payload.values[0] : '';
+            const providers = getOrderedProviders();
 
-            if (selectedValue === 'nav:prev' || selectedValue === 'nav:next') {
-              const nextPage = selectedValue === 'nav:next' ? currentPage + 1 : currentPage - 1;
-              const view = createModelMenuView(runtimeModels, runtimeActiveModel, nextPage);
+            if (selectedValue === 'provider:nav:prev' || selectedValue === 'provider:nav:next') {
+              const nextPage = selectedValue === 'provider:nav:next' ? currentPage + 1 : currentPage - 1;
+              const view = createProviderMenuView(providers, runtimeActiveModel, nextPage);
               await payload.interaction.update(view);
               return;
             }
 
-            if (!selectedValue.startsWith('set:')) {
-              const view = createModelMenuView(runtimeModels, runtimeActiveModel, currentPage, 'Unknown selection.');
+            if (!selectedValue.startsWith('provider:set:')) {
+              const view = createProviderMenuView(providers, runtimeActiveModel, currentPage, 'Unknown selection.');
               await payload.interaction.update(view);
               return;
             }
 
-            const selectedIndex = Number.parseInt(selectedValue.slice(4), 10);
-            if (!Number.isFinite(selectedIndex) || selectedIndex < 0 || selectedIndex >= runtimeModels.length) {
-              const view = createModelMenuView(runtimeModels, runtimeActiveModel, currentPage, 'Selected model is no longer available.');
+            const selectedIndex = Number.parseInt(selectedValue.slice('provider:set:'.length), 10);
+            if (!Number.isFinite(selectedIndex) || selectedIndex < 0 || selectedIndex >= providers.length) {
+              const view = createProviderMenuView(providers, runtimeActiveModel, currentPage, 'Selected provider is no longer available.');
               await payload.interaction.update(view);
               return;
             }
 
-            const selectedEntry = runtimeModels[selectedIndex];
-            const selectedId = toModelId(selectedEntry);
-            if (!selectedId) {
-              const view = createModelMenuView(runtimeModels, runtimeActiveModel, currentPage, 'Selected model entry is invalid.');
+            const provider = providers[selectedIndex];
+            if (!provider) {
+              const view = createProviderMenuView(providers, runtimeActiveModel, currentPage, 'Selected provider entry is invalid.');
               await payload.interaction.update(view);
               return;
             }
 
-            const switchResult = await switchActiveModel(selectedId, runtimeModels);
+            markRecentProvider(provider);
+            await persistModelPickerRecents();
+
+            const modelsForProvider = getOrderedModelsForProvider(provider);
+            const activeModelIndex = modelsForProvider.findIndex((modelId) => `${provider}/${modelId}` === runtimeActiveModel);
+            const modelPage = activeModelIndex >= 0 ? Math.floor(activeModelIndex / MODELS_PER_PAGE) : 0;
+            const view = createProviderModelMenuView(provider, modelsForProvider, runtimeActiveModel, modelPage);
+            await payload.interaction.update(view);
+          } catch (err) {
+            if (typeof onError === 'function') {
+              onError(err);
+            }
+            try {
+              await payload.interaction.reply({
+                content: `Failed to select provider: ${err.message}`,
+                ephemeral: true,
+              });
+            } catch (_replyErr) {
+              // Ignore
+            }
+          }
+          return;
+        }
+
+        if (
+          payload.isSelectMenu &&
+          typeof payload.customId === 'string' &&
+          payload.customId.startsWith(`${MODEL_MODEL_SELECT_MENU_PREFIX}:`)
+        ) {
+          try {
+            try {
+              await refreshRuntimeModelsFromPi();
+            } catch (_err) {
+              // Keep last known runtime models if Pi catalog lookup fails.
+            }
+
+            const parsedCustomId = parseProviderModelSelectCustomId(payload.customId);
+            if (!parsedCustomId) {
+              await payload.interaction.reply({
+                content: 'Unable to parse model selection state. Run `/model` again.',
+                ephemeral: true,
+              });
+              return;
+            }
+
+            const { provider, page: currentPage } = parsedCustomId;
+            const selectedValue = payload.values && payload.values[0] ? payload.values[0] : '';
+            const modelsForProvider = getOrderedModelsForProvider(provider);
+
+            if (selectedValue === 'model:back') {
+              const providers = getOrderedProviders();
+              const providerIndex = providers.indexOf(provider);
+              const providerPage = providerIndex >= 0 ? Math.floor(providerIndex / PROVIDERS_PER_PAGE) : 0;
+              const view = createProviderMenuView(providers, runtimeActiveModel, providerPage);
+              await payload.interaction.update(view);
+              return;
+            }
+
+            if (selectedValue === 'model:nav:prev' || selectedValue === 'model:nav:next') {
+              const nextPage = selectedValue === 'model:nav:next' ? currentPage + 1 : currentPage - 1;
+              const view = createProviderModelMenuView(provider, modelsForProvider, runtimeActiveModel, nextPage);
+              await payload.interaction.update(view);
+              return;
+            }
+
+            if (!selectedValue.startsWith('model:set:')) {
+              const view = createProviderModelMenuView(provider, modelsForProvider, runtimeActiveModel, currentPage, 'Unknown selection.');
+              await payload.interaction.update(view);
+              return;
+            }
+
+            const selectedIndex = Number.parseInt(selectedValue.slice('model:set:'.length), 10);
+            if (!Number.isFinite(selectedIndex) || selectedIndex < 0 || selectedIndex >= modelsForProvider.length) {
+              const view = createProviderModelMenuView(provider, modelsForProvider, runtimeActiveModel, currentPage, 'Selected model is no longer available.');
+              await payload.interaction.update(view);
+              return;
+            }
+
+            const modelId = modelsForProvider[selectedIndex];
+            if (!modelId) {
+              const view = createProviderModelMenuView(provider, modelsForProvider, runtimeActiveModel, currentPage, 'Selected model entry is invalid.');
+              await payload.interaction.update(view);
+              return;
+            }
+
+            const selectedModelId = `${provider}/${modelId}`;
+            const switchResult = await switchActiveModel(selectedModelId);
+            markRecentProvider(provider);
+            markRecentModel(provider, modelId);
+            await persistModelPickerRecents();
+
+            const reorderedModels = getOrderedModelsForProvider(provider);
+            const reorderedIndex = reorderedModels.indexOf(modelId);
+            const page = reorderedIndex >= 0 ? Math.floor(reorderedIndex / MODELS_PER_PAGE) : 0;
             const warning = switchResult.warning ? `\n${switchResult.warning}` : '';
-            const page = Math.floor(selectedIndex / MODELS_PER_PAGE);
-            const view = createModelMenuView(runtimeModels, runtimeActiveModel, page, `Switched active model to \`${selectedId}\`.${warning}`);
+            const view = createProviderModelMenuView(
+              provider,
+              reorderedModels,
+              runtimeActiveModel,
+              page,
+              `Switched active model to \`${selectedModelId}\`.${warning}`
+            );
             await payload.interaction.update(view);
           } catch (err) {
             if (typeof onError === 'function') {

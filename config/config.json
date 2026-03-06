@@ -3,49 +3,7 @@
     "channel_id": "1466871283160449155",
     "application_id": "1465731621196927210"
   },
-  "activeModel": "openai-codex/gpt-5.3-codex",
-  "models": [
-    {
-      "provider": "google",
-      "model": "gemini-3-flash-preview"
-    },
-    {
-      "provider": "openai-codex",
-      "model": "gpt-5.1-codex-mini"
-    },
-    {
-      "provider": "openai-codex",
-      "model": "gpt-5.3-codex"
-    },
-    {
-      "provider": "opencode",
-      "model": "glm-4.7-free"
-    },
-    {
-      "provider": "opencode",
-      "model": "kimi-k2.5-free"
-    },
-    {
-      "provider": "opencode",
-      "model": "minimax-m2.1-free"
-    },
-    {
-      "provider": "opencode",
-      "model": "big-pickle"
-    },
-    {
-      "provider": "opencode",
-      "model": "gpt-5-nano"
-    },
-    {
-      "provider": "openai-codex",
-      "model": "gpt-5.2"
-    },
-    {
-      "provider": "openai-codex",
-      "model": "gpt-5.2-codex"
-    }
-  ],
+  "activeModel": "openai-codex/gpt-5.4",
   "reminders": {
     "file_path": "/mnt/f/Obsidian-Vaults/Simon/Reminders.md",
     "timezone": "Europe/London",
@@ -55,5 +13,15 @@
   "debug": {
     "agentLogInteractions": 3
   },
-  "thinkingLevel": "high"
+  "thinkingLevel": "high",
+  "modelPicker": {
+    "recentProviders": [
+      "openai-codex"
+    ],
+    "recentModelsByProvider": {
+      "openai-codex": [
+        "gpt-5.4"
+      ]
+    }
+  }
 }

@@ -39,14 +39,6 @@ export function getCommandDefinitions() {
                     )),
         new SlashCommandBuilder()
             .setName('model')
-            .setDescription('List, add, and switch active model')
-            .addStringOption(option =>
-                option.setName('provider')
-                    .setDescription('Provider ID (for adding/switching)')
-                    .setRequired(false))
-            .addStringOption(option =>
-                option.setName('model')
-                    .setDescription('Model ID (for adding/switching)')
-                    .setRequired(false)),
+            .setDescription('Choose provider and model from Pi registry'),
     ];
 }

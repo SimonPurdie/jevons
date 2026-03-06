@@ -65,71 +65,108 @@ function makeModel(provider, id) {
   };
 }
 
-test('/model command shows paginated list and supports next-page navigation', async () => {
+function getSelectMenuData(payload) {
+  const row = payload?.components?.[0];
+  const menu = row?.components?.[0];
+  if (!menu) {
+    return null;
+  }
+  if (typeof menu.toJSON === 'function') {
+    return menu.toJSON();
+  }
+  return menu.data || menu;
+}
+
+function getSelectMenuCustomId(payload) {
+  const data = getSelectMenuData(payload);
+  if (!data) {
+    return '';
+  }
+  return data.custom_id || data.customId || '';
+}
+
+function getSelectOptions(payload, predicate = () => true) {
+  const data = getSelectMenuData(payload);
+  const options = Array.isArray(data?.options) ? data.options : [];
+  return options.filter(predicate);
+}
+
+function findOptionByLabel(payload, labelPrefix, predicate = () => true) {
+  const options = getSelectOptions(payload, predicate);
+  return options.find((option) => typeof option.label === 'string' && option.label.startsWith(labelPrefix));
+}
+
+test('/model command starts with provider picker and supports provider pagination', async () => {
   const client = new MockDiscordClient();
   const replies = [];
   const updates = [];
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jevons-model-menu-test-'));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jevons-model-provider-menu-test-'));
   const configPath = path.join(tempDir, 'config.json');
-  const models = Array.from({ length: 30 }, (_, i) => ({ provider: 'p', model: `m-${i}` }));
+
+  const providers = Array.from({ length: 30 }, (_, i) => `provider-${String(i).padStart(2, '0')}`);
+  const catalog = providers.map((provider) => makeModel(provider, 'model-1'));
 
   try {
     await createDiscordRuntime({
       client,
       token: 'token-123',
       channelId: 'test-channel',
-      activeModel: 'p/m-0',
-      models,
+      activeModel: 'provider-00/model-1',
       configPath,
       authStorage: { getApiKey: async () => 'test-key' },
-      getModel: (provider, model) => makeModel(provider, model),
       sendMessage: () => Promise.resolve(),
-      deps: { Agent: MockAgent },
+      deps: {
+        Agent: MockAgent,
+        resolvePiAi: async () => ({
+          getProviders: () => providers,
+          getModels: (provider) => catalog.filter((entry) => entry.provider === provider),
+          getModel: (provider, model) => catalog.find((entry) => entry.provider === provider && entry.id === model) || null,
+        }),
+      },
     });
 
-    const modelInteraction = {
+    client.emit('interactionCreate', {
       commandName: 'model',
       isChatInputCommand: () => true,
       isStringSelectMenu: () => false,
       channel: { id: 'test-channel', isThread: () => false, parentId: null },
       guild: { name: 'TestGuild' },
       user: { id: 'user-1' },
-      options: { getString: () => null },
+      options: {},
       reply: async (payload) => { replies.push(payload); },
-    };
-    client.emit('interactionCreate', modelInteraction);
+    });
     await flush();
 
     assert.equal(replies.length, 1);
     assert.equal(replies[0].ephemeral, true);
-    assert.ok(replies[0].content.includes('page 1/2'));
+    assert.ok(replies[0].content.includes('Providers: 30 (page 1/2)'));
 
-    const selectInteraction = {
+    client.emit('interactionCreate', {
       isChatInputCommand: () => false,
       isStringSelectMenu: () => true,
-      customId: 'model_switch_select:0',
-      values: ['nav:next'],
+      customId: 'model_provider_select:0',
+      values: ['provider:nav:next'],
       channel: { id: 'test-channel', isThread: () => false, parentId: null },
       guild: { name: 'TestGuild' },
       user: { id: 'user-1' },
       update: async (payload) => { updates.push(payload); },
       reply: async () => { },
-    };
-    client.emit('interactionCreate', selectInteraction);
+    });
     await flush();
 
     assert.equal(updates.length, 1);
-    assert.ok(updates[0].content.includes('page 2/2'));
+    assert.ok(updates[0].content.includes('Providers: 30 (page 2/2)'));
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
 
-test('/model add flow persists config and switches runtime without resetting session history', async () => {
+test('/model provider->model flow switches active model and preserves session history', async () => {
   const client = new MockDiscordClient();
   const sends = [];
   const replies = [];
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jevons-model-switch-test-'));
+  const updates = [];
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jevons-model-flow-switch-test-'));
   const sessionDir = path.join(tempDir, 'sessions');
   fs.mkdirSync(sessionDir, { recursive: true });
   const configPath = path.join(tempDir, 'config.json');
@@ -138,44 +175,81 @@ test('/model add flow persists config and switches runtime without resetting ses
     models: [{ provider: 'p', model: 'old' }],
   }), 'utf8');
 
+  const catalog = [
+    makeModel('p', 'old'),
+    makeModel('p2', 'new'),
+  ];
+  const providers = ['p', 'p2'];
+
   try {
     await createDiscordRuntime({
       client,
       token: 'token-123',
       channelId: 'test-channel',
       activeModel: 'p/old',
-      models: [{ provider: 'p', model: 'old' }],
       configPath,
       sessionDir,
       authStorage: { getApiKey: async () => 'test-key' },
-      getModel: (provider, model) => makeModel(provider, model),
       sendMessage: (payload) => {
         sends.push(payload);
         return Promise.resolve();
       },
-      deps: { Agent: MockAgent },
+      deps: {
+        Agent: MockAgent,
+        resolvePiAi: async () => ({
+          getProviders: () => providers,
+          getModels: (provider) => catalog.filter((entry) => entry.provider === provider),
+          getModel: (provider, model) => catalog.find((entry) => entry.provider === provider && entry.id === model) || null,
+        }),
+      },
     });
 
     client.emit('messageCreate', makeMessage('before switch'));
     await flush(200);
 
-    const addInteraction = {
+    client.emit('interactionCreate', {
       commandName: 'model',
       isChatInputCommand: () => true,
       isStringSelectMenu: () => false,
       channel: { id: 'test-channel', isThread: () => false, parentId: null },
       guild: { name: 'TestGuild' },
       user: { id: 'user-1' },
-      options: {
-        getString: (name) => {
-          if (name === 'provider') return 'p2';
-          if (name === 'model') return 'new';
-          return null;
-        },
-      },
+      options: {},
       reply: async (payload) => { replies.push(payload); },
-    };
-    client.emit('interactionCreate', addInteraction);
+    });
+    await flush();
+
+    const providerOption = findOptionByLabel(replies[0], 'p2', (option) => option.value.startsWith('provider:set:'));
+    assert.ok(providerOption, 'Expected provider option for p2');
+
+    client.emit('interactionCreate', {
+      isChatInputCommand: () => false,
+      isStringSelectMenu: () => true,
+      customId: getSelectMenuCustomId(replies[0]),
+      values: [providerOption.value],
+      channel: { id: 'test-channel', isThread: () => false, parentId: null },
+      guild: { name: 'TestGuild' },
+      user: { id: 'user-1' },
+      update: async (payload) => { updates.push(payload); },
+      reply: async () => { },
+    });
+    await flush();
+
+    const modelMenuPayload = updates[0];
+    const modelOption = findOptionByLabel(modelMenuPayload, 'new', (option) => option.value.startsWith('model:set:'));
+    assert.ok(modelOption, 'Expected model option for p2/new');
+
+    client.emit('interactionCreate', {
+      isChatInputCommand: () => false,
+      isStringSelectMenu: () => true,
+      customId: getSelectMenuCustomId(modelMenuPayload),
+      values: [modelOption.value],
+      channel: { id: 'test-channel', isThread: () => false, parentId: null },
+      guild: { name: 'TestGuild' },
+      user: { id: 'user-1' },
+      update: async (payload) => { updates.push(payload); },
+      reply: async () => { },
+    });
     await flush(200);
 
     client.emit('messageCreate', makeMessage('after switch'));
@@ -183,17 +257,152 @@ test('/model add flow persists config and switches runtime without resetting ses
 
     assert.ok(sends.some((entry) => entry.content.includes('reply:p/old')));
     assert.ok(sends.some((entry) => entry.content.includes('reply:p2/new')));
-    assert.equal(replies.length, 1);
-    assert.ok(replies[0].content.includes('Added model and switched active model.'));
+    assert.ok(updates[1].content.includes('Switched active model to `p2/new`.'));
 
     const savedConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
     assert.equal(savedConfig.activeModel, 'p2/new');
-    assert.ok(savedConfig.models.some((entry) => entry.provider === 'p2' && entry.model === 'new'));
+    assert.deepEqual(savedConfig.models, [{ provider: 'p', model: 'old' }]);
 
     const sessionManager = new DiscordSessionManager({ sessionDir });
     const branch = sessionManager.getOrCreate('test-channel').sessionManager.getBranch();
     const messageEntries = branch.filter((entry) => entry.type === 'message');
     assert.ok(messageEntries.length >= 4, 'Expected conversation history to remain in the same session');
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('/model picker prioritizes recent providers/models (max 5) then alphabetical', async () => {
+  const client = new MockDiscordClient();
+  const replies = [];
+  const updates = [];
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jevons-model-recents-test-'));
+  const configPath = path.join(tempDir, 'config.json');
+  fs.writeFileSync(configPath, JSON.stringify({
+    activeModel: 'alpha/a1',
+  }), 'utf8');
+
+  const catalog = [
+    makeModel('alpha', 'a1'),
+    makeModel('alpha', 'a2'),
+    makeModel('beta', 'b1'),
+    makeModel('beta', 'b2'),
+    makeModel('beta', 'b3'),
+    makeModel('delta', 'd1'),
+    makeModel('gamma', 'g1'),
+  ];
+  const providers = ['alpha', 'beta', 'delta', 'gamma'];
+
+  try {
+    await createDiscordRuntime({
+      client,
+      token: 'token-123',
+      channelId: 'test-channel',
+      activeModel: 'alpha/a1',
+      configPath,
+      authStorage: { getApiKey: async () => 'test-key' },
+      sendMessage: () => Promise.resolve(),
+      deps: {
+        Agent: MockAgent,
+        resolvePiAi: async () => ({
+          getProviders: () => providers,
+          getModels: (provider) => catalog.filter((entry) => entry.provider === provider),
+          getModel: (provider, model) => catalog.find((entry) => entry.provider === provider && entry.id === model) || null,
+        }),
+      },
+    });
+
+    client.emit('interactionCreate', {
+      commandName: 'model',
+      isChatInputCommand: () => true,
+      isStringSelectMenu: () => false,
+      channel: { id: 'test-channel', isThread: () => false, parentId: null },
+      guild: { name: 'TestGuild' },
+      user: { id: 'user-1' },
+      options: {},
+      reply: async (payload) => { replies.push(payload); },
+    });
+    await flush();
+
+    const providerOptionsInitial = getSelectOptions(replies[0], (option) => option.value.startsWith('provider:set:'));
+    const providerLabelsInitial = providerOptionsInitial.map((option) => option.label.replace(' (active)', ''));
+    assert.deepEqual(providerLabelsInitial.slice(0, 4), ['alpha', 'beta', 'delta', 'gamma']);
+
+    const betaProviderOption = findOptionByLabel(replies[0], 'beta', (option) => option.value.startsWith('provider:set:'));
+    assert.ok(betaProviderOption, 'Expected provider option for beta');
+
+    client.emit('interactionCreate', {
+      isChatInputCommand: () => false,
+      isStringSelectMenu: () => true,
+      customId: getSelectMenuCustomId(replies[0]),
+      values: [betaProviderOption.value],
+      channel: { id: 'test-channel', isThread: () => false, parentId: null },
+      guild: { name: 'TestGuild' },
+      user: { id: 'user-1' },
+      update: async (payload) => { updates.push(payload); },
+      reply: async () => { },
+    });
+    await flush();
+
+    const betaModelMenu = updates[0];
+    const betaModelOption = findOptionByLabel(betaModelMenu, 'b3', (option) => option.value.startsWith('model:set:'));
+    assert.ok(betaModelOption, 'Expected model option for beta/b3');
+
+    client.emit('interactionCreate', {
+      isChatInputCommand: () => false,
+      isStringSelectMenu: () => true,
+      customId: getSelectMenuCustomId(betaModelMenu),
+      values: [betaModelOption.value],
+      channel: { id: 'test-channel', isThread: () => false, parentId: null },
+      guild: { name: 'TestGuild' },
+      user: { id: 'user-1' },
+      update: async (payload) => { updates.push(payload); },
+      reply: async () => { },
+    });
+    await flush();
+
+    client.emit('interactionCreate', {
+      commandName: 'model',
+      isChatInputCommand: () => true,
+      isStringSelectMenu: () => false,
+      channel: { id: 'test-channel', isThread: () => false, parentId: null },
+      guild: { name: 'TestGuild' },
+      user: { id: 'user-1' },
+      options: {},
+      reply: async (payload) => { replies.push(payload); },
+    });
+    await flush();
+
+    const providerOptionsAfter = getSelectOptions(replies[1], (option) => option.value.startsWith('provider:set:'));
+    const providerLabelsAfter = providerOptionsAfter.map((option) => option.label.replace(' (active)', ''));
+    assert.equal(providerLabelsAfter[0], 'beta');
+    assert.deepEqual(providerLabelsAfter.slice(1, 4), ['alpha', 'delta', 'gamma']);
+
+    const betaProviderOptionAgain = findOptionByLabel(replies[1], 'beta', (option) => option.value.startsWith('provider:set:'));
+    assert.ok(betaProviderOptionAgain, 'Expected provider option for beta after recent pick');
+
+    client.emit('interactionCreate', {
+      isChatInputCommand: () => false,
+      isStringSelectMenu: () => true,
+      customId: getSelectMenuCustomId(replies[1]),
+      values: [betaProviderOptionAgain.value],
+      channel: { id: 'test-channel', isThread: () => false, parentId: null },
+      guild: { name: 'TestGuild' },
+      user: { id: 'user-1' },
+      update: async (payload) => { updates.push(payload); },
+      reply: async () => { },
+    });
+    await flush();
+
+    const recentBetaModelMenu = updates[2];
+    const betaModelsAfter = getSelectOptions(recentBetaModelMenu, (option) => option.value.startsWith('model:set:'))
+      .map((option) => option.label.replace(' (active)', ''));
+    assert.equal(betaModelsAfter[0], 'b3');
+    assert.deepEqual(betaModelsAfter.slice(1, 3), ['b1', 'b2']);
+
+    const savedConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    assert.deepEqual(savedConfig.modelPicker.recentProviders, ['beta']);
+    assert.deepEqual(savedConfig.modelPicker.recentModelsByProvider.beta, ['b3']);
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }

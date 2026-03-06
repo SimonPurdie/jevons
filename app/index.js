@@ -44,8 +44,8 @@ export async function startDiscordRuntime(deps = {}) {
     throw new Error('Discord channel_id missing in config');
   }
 
-  if (!config.activeModel && (!config.models || Object.keys(config.models).length === 0)) {
-    throw new Error('Configuration error: "activeModel" and "models" must be defined in config.json.');
+  if (typeof config.activeModel !== 'string' || !config.activeModel.trim()) {
+    throw new Error('Configuration error: "activeModel" must be defined in config.json.');
   }
 
   const client = _createDiscordClient();
@@ -77,7 +77,6 @@ export async function startDiscordRuntime(deps = {}) {
     channelId: discordConfig.channel_id,
     applicationId: discordConfig.application_id,
     activeModel: config.activeModel,
-    models: config.models,
     thinkingLevel: config.thinkingLevel,
     authStorage,
     skillsDir: path.join(__dirname, '../skills'),
