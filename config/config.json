@@ -3,7 +3,7 @@
     "channel_id": "1466871283160449155",
     "application_id": "1465731621196927210"
   },
-  "activeModel": "openai-codex/gpt-5.4",
+  "activeModel": "openai-codex/gpt-5.5",
   "reminders": {
     "file_path": "/mnt/f/Obsidian-Vaults/Simon/Reminders.md",
     "timezone": "Europe/London",
@@ -16,12 +16,22 @@
   "thinkingLevel": "high",
   "modelPicker": {
     "recentProviders": [
+      "opencode",
       "openai-codex"
     ],
     "recentModelsByProvider": {
       "openai-codex": [
         "gpt-5.4"
+      ],
+      "opencode": [
+        "gemini-3-flash"
       ]
     }
-  }
+  },
+  "models": [
+    {
+      "provider": "openai-codex",
+      "model": "gpt-5.5"
+    }
+  ]
 }

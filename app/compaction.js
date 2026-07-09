@@ -2,7 +2,7 @@ import {
     generateSummary, 
     findCutPoint, 
     DEFAULT_COMPACTION_SETTINGS 
-} from '@mariozechner/pi-coding-agent';
+} from '@earendil-works/pi-coding-agent';
 
 /**
  * Performs manual compaction on a session.
@@ -56,6 +56,23 @@ export async function performCompaction(session, model, apiKey, customInstructio
         }
     }
 
+    const streamFn = typeof model?.completeSimple === 'function'
+        ? async (_model, context, completionOptions) => ({
+            result: async () => {
+                const response = await model.completeSimple(model, context, completionOptions);
+                const content = Array.isArray(response?.content)
+                    ? response.content
+                    : [{ type: 'text', text: String(response?.content ?? '') }];
+                return {
+                    ...response,
+                    role: response?.role || 'assistant',
+                    content,
+                    stopReason: response?.stopReason || 'stop',
+                };
+            },
+        })
+        : undefined;
+
     // Generate summary using the LLM
     const summary = await generateSummary(
         messagesToSummarize, 
@@ -63,8 +80,11 @@ export async function performCompaction(session, model, apiKey, customInstructio
         settings.reserveTokens, 
         apiKey, 
         undefined, 
+        undefined, 
         customInstructions, 
-        previousSummary
+        previousSummary,
+        undefined,
+        streamFn
     );
     
     // Append the compaction to the session

@@ -3,7 +3,8 @@ import path from 'path';
 import fs from 'fs';
 import { loadConfig, saveConfig } from './config.js';
 import { AuthStorage } from './auth.js';
-import { getOAuthProvider } from '@mariozechner/pi-ai';
+import { selectOAuthOption } from './oauthLogin.js';
+import { getOAuthProvider } from '@earendil-works/pi-ai/oauth';
 
 // Initialize AuthStorage with config/auth.json
 const authStorage = new AuthStorage(path.join(process.cwd(), 'config', 'auth.json'));
@@ -248,7 +249,7 @@ async function editModel(rl, config, index) {
 
 async function checkAndSetupAuth(rl, providerId, force = false) {
     // Check if we have auth already
-    if (!force && authStorage.hasAuth(providerId)) {
+    if (!force && (await authStorage.hasAuth(providerId))) {
         return;
     }
 
@@ -262,9 +263,19 @@ async function checkAndSetupAuth(rl, providerId, force = false) {
                     console.log(`\nPlease authenticate via your browser: ${info.url}`);
                     if (info.instructions) console.log(info.instructions);
                 },
+                onDeviceCode: (info) => {
+                    console.log(`\nOpen ${info.verificationUri} and enter code: ${info.userCode}`);
+                },
                 onPrompt: async (promptConfig) => {
                     return await prompt(rl, `\n${promptConfig.message} `);
                 },
+                onManualCodeInput: async () => {
+                    return await prompt(rl, '\nPaste the authorization code: ');
+                },
+                onSelect: async (selectPrompt) => selectOAuthOption(selectPrompt, {
+                    providerId,
+                    prompt: (question) => prompt(rl, question)
+                }),
                 onProgress: (msg) => console.log(msg)
             });
 
@@ -277,7 +288,7 @@ async function checkAndSetupAuth(rl, providerId, force = false) {
         }
     } else {
         // API Key fallback
-        if (force || !authStorage.hasAuth(providerId)) {
+        if (force || !(await authStorage.hasAuth(providerId))) {
             const apiKey = await prompt(rl, `Enter API Key for ${providerId} (leave empty to skip): `);
             if (apiKey.trim()) {
                 authStorage.set(providerId, { type: 'api_key', key: apiKey.trim() });

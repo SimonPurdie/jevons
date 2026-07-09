@@ -83,7 +83,7 @@ function formatAgentDebugInteractions(interactions) {
 async function resolvePiAi() {
   try {
     // Dynamic import for ESM module
-    const module = await import('@mariozechner/pi-ai');
+    const module = await import('@earendil-works/pi-ai/compat');
     return module;
   } catch (err) {
     throw new Error('pi-ai is not installed; run npm install');
@@ -92,7 +92,7 @@ async function resolvePiAi() {
 
 async function resolvePiAgentCore() {
   try {
-    return await import('@mariozechner/pi-agent-core');
+    return await import('@earendil-works/pi-agent-core');
   } catch (err) {
     throw new Error('pi-agent-core is not installed; run npm install');
   }

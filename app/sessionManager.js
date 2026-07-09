@@ -1,4 +1,5 @@
-import { SessionManager as PiSessionManager } from '@mariozechner/pi-coding-agent';
+import { SessionManager as PiSessionManager } from '@earendil-works/pi-coding-agent';
+import fs from 'fs';
 import path from 'path';
 import logger from './logger.js';
 
@@ -155,12 +156,12 @@ export class DiscordSessionManager {
         try {
             sessionManager = PiSessionManager.open(fullPath, contextSessionDir);
         } catch (err) {
-            logger.error(`Failed to open session file for context ${contextId}`, {
+            logger.warn(`Failed to open session file for context ${contextId}, creating new session`, {
                 contextId,
                 sessionFilePath,
                 error: err.message,
             });
-            throw new Error(`Cannot resume session: session file is corrupt or unreadable. Error: ${err.message}`);
+            sessionManager = PiSessionManager.create(this.cwd, contextSessionDir);
         }
 
         this.sessions.set(contextId, sessionManager);
@@ -192,11 +193,26 @@ export class DiscordSessionManager {
             throw new Error('No active session to fork from');
         }
 
-        // createBranchedSession returns the path to the new session file
+        // createBranchedSession returns the path to the new session file and updates
+        // the source manager to point at the branched session.
         const branchedSessionPath = session.sessionManager.createBranchedSession(entryId);
         
-        // Open the new branched session
+        // Open the new branched session. Pi defers writing user-only sessions until
+        // an assistant message is appended; write the branch explicitly here so the
+        // Discord resume UI can discover the fork immediately.
         const contextSessionDir = this._getContextSessionDir(contextId);
+        if (branchedSessionPath && !fs.existsSync(branchedSessionPath)) {
+            const header = session.sessionManager.getHeader();
+            const entries = session.sessionManager.getBranch();
+            if (header) {
+                fs.mkdirSync(path.dirname(branchedSessionPath), { recursive: true });
+                fs.writeFileSync(
+                    branchedSessionPath,
+                    [header, ...entries].map((entry) => JSON.stringify(entry)).join('\n') + '\n',
+                    'utf8'
+                );
+            }
+        }
         const branchedManager = PiSessionManager.open(branchedSessionPath, contextSessionDir);
         
         this.sessions.set(contextId, branchedManager);

@@ -1,5 +1,5 @@
 import path from 'path';
-import { AuthStorage as PiAuthStorage, FileAuthStorageBackend } from '@mariozechner/pi-coding-agent';
+import { AuthStorage as PiAuthStorage, FileAuthStorageBackend } from '@earendil-works/pi-coding-agent';
 
 function getDefaultAuthPath() {
     return path.join(process.cwd(), 'config', 'auth.json');

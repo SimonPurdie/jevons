@@ -6,7 +6,7 @@ import path from 'path';
 import os from 'os';
 import { createDiscordRuntime } from '../../../app/runtime.js';
 import { DiscordSessionManager } from '../../../app/sessionManager.js';
-import { registerApiProvider } from '@mariozechner/pi-ai';
+import { registerApiProvider } from '@earendil-works/pi-ai/compat';
 
 // Register a mock API provider for summarization
 registerApiProvider({
