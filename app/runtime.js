@@ -15,6 +15,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_AGENT_DEBUG_INTERACTION_LIMIT = 3;
 const THINKING_LEVELS = new Set(['off', 'minimal', 'low', 'medium', 'high', 'xhigh']);
 const DEFAULT_THINKING_LEVEL = 'off';
+const MAX_DISCORD_ERROR_LENGTH = 1500;
 
 
 function normalizeAgentDebugInteractionLimit(value) {
@@ -41,6 +42,16 @@ function formatThinkingLevel(value) {
     return DEFAULT_THINKING_LEVEL;
   }
   return value;
+}
+
+function formatDiscordError(error) {
+  const rawMessage = error instanceof Error ? error.message : String(error ?? '');
+  const message = rawMessage.trim() || 'Unknown error';
+  const mentionSafeMessage = message.replaceAll('@', '@\u200b');
+  const truncatedMessage = mentionSafeMessage.length > MAX_DISCORD_ERROR_LENGTH
+    ? `${mentionSafeMessage.slice(0, MAX_DISCORD_ERROR_LENGTH - 3)}...`
+    : mentionSafeMessage;
+  return `Sorry, I couldn't process that message.\n\nError: ${truncatedMessage}`;
 }
 
 function parseAgentDebugInteractions(raw) {
@@ -1126,6 +1137,35 @@ export async function createDiscordRuntime(options) {
     return typeof content === 'string' && content.trim().startsWith('/fork');
   }
 
+  async function reportMessageError(payload, error) {
+    if (typeof onError === 'function') {
+      try {
+        onError(error);
+      } catch (_onErrorErr) {
+        // Error logging must not prevent the Discord response below.
+      }
+    }
+    try {
+      await sendMessage({
+        content: formatDiscordError(error),
+        channelId: payload.channelId,
+        threadId: payload.threadId,
+        contextId: payload.contextId,
+        messageId: payload.messageId,
+        authorId: payload.authorId,
+      });
+    } catch (sendErr) {
+      if (typeof onError === 'function') {
+        try {
+          const message = sendErr instanceof Error ? sendErr.message : String(sendErr);
+          onError(new Error(`Failed to send Discord error response: ${message}`));
+        } catch (_onErrorErr) {
+          // There is no remaining delivery channel for this error.
+        }
+      }
+    }
+  }
+
   const bot = createDiscordBot({
     client,
     token,
@@ -1905,13 +1945,11 @@ export async function createDiscordRuntime(options) {
             });
           }
         } catch (err) {
-          if (typeof onError === 'function') {
-            onError(err);
-          }
+          await reportMessageError(payload, err);
         } finally {
           stopTyping();
         }
-      })();
+      })().catch((err) => reportMessageError(payload, err));
     },
   });
 

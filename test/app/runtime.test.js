@@ -163,6 +163,56 @@ test('createDiscordRuntime sends model reply via sendMessage', async () => {
   assert.equal(sends[0].channelId, 'root');
 });
 
+test('createDiscordRuntime sends processing errors back to the Discord context', async () => {
+  const client = new MockDiscordClient();
+  const sends = [];
+  const errors = [];
+
+  class ThrowingAgent {
+    constructor(options) {
+      this.state = {
+        ...options.initialState,
+        messages: [...options.initialState.messages],
+      };
+    }
+
+    async prompt() {
+      throw new Error('Model request failed for @everyone');
+    }
+  }
+
+  await createDiscordRuntime({
+    client,
+    token: 'token-123',
+    channelId: 'root',
+    modelInstance: { id: 'model-test' },
+    sendMessage: (payload) => {
+      sends.push(payload);
+      return Promise.resolve();
+    },
+    onError: (error) => {
+      errors.push(error);
+    },
+    deps: { Agent: ThrowingAgent },
+  });
+
+  client.emit('messageCreate', makeMessage({
+    channelId: 'thread-1',
+    parentId: 'root',
+    isThread: true,
+    content: 'Hello',
+  }));
+  await flush(200);
+
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0].message, 'Model request failed for @everyone');
+  assert.equal(sends.length, 1);
+  assert.match(sends[0].content, /^Sorry, I couldn't process that message\./);
+  assert.ok(sends[0].content.includes('Model request failed for @\u200beveryone'));
+  assert.equal(sends[0].channelId, 'root');
+  assert.equal(sends[0].threadId, 'thread-1');
+});
+
 test('createDiscordRuntime persists user messages and agent replies to session', async () => {
   const client = new MockDiscordClient();
   const sends = [];
