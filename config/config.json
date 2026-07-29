@@ -3,7 +3,7 @@
     "channel_id": "1466871283160449155",
     "application_id": "1465731621196927210"
   },
-  "activeModel": "openai-codex/gpt-5.5",
+  "activeModel": "openai-codex/gpt-5.6-sol",
   "reminders": {
     "file_path": "/mnt/f/Obsidian-Vaults/Simon/Reminders.md",
     "timezone": "Europe/London",
@@ -16,11 +16,12 @@
   "thinkingLevel": "high",
   "modelPicker": {
     "recentProviders": [
-      "opencode",
-      "openai-codex"
+      "openai-codex",
+      "opencode"
     ],
     "recentModelsByProvider": {
       "openai-codex": [
+        "gpt-5.6-sol",
         "gpt-5.4"
       ],
       "opencode": [

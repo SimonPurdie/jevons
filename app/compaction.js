@@ -4,6 +4,18 @@ import {
     DEFAULT_COMPACTION_SETTINGS 
 } from '@earendil-works/pi-coding-agent';
 
+
+function normalizeMessageForCompaction(message) {
+    if (!message || typeof message !== 'object') return message;
+    if (typeof message.content === 'string') {
+        return {
+            ...message,
+            content: [{ type: 'text', text: message.content }],
+        };
+    }
+    return message;
+}
+
 /**
  * Performs manual compaction on a session.
  * 
@@ -41,7 +53,7 @@ export async function performCompaction(session, model, apiKey, customInstructio
     // Messages to summarize (all messages before the cut point)
     const messagesToSummarize = branch.slice(0, cutPoint.firstKeptEntryIndex)
         .filter(e => e.type === 'message')
-        .map(e => e.message);
+        .map(e => normalizeMessageForCompaction(e.message));
 
     if (messagesToSummarize.length === 0) {
         throw new Error('No messages to summarize before the cut point.');

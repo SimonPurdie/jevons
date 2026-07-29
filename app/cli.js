@@ -4,7 +4,6 @@ import fs from 'fs';
 import { loadConfig, saveConfig } from './config.js';
 import { AuthStorage } from './auth.js';
 import { selectOAuthOption } from './oauthLogin.js';
-import { getOAuthProvider } from '@earendil-works/pi-ai/oauth';
 
 // Initialize AuthStorage with config/auth.json
 const authStorage = new AuthStorage(path.join(process.cwd(), 'config', 'auth.json'));
@@ -253,12 +252,12 @@ async function checkAndSetupAuth(rl, providerId, force = false) {
         return;
     }
 
-    const oauthProvider = getOAuthProvider(providerId);
+    const providerConfig = SUPPORTED_PROVIDERS.find((provider) => provider.id === providerId);
 
-    if (oauthProvider) {
+    if (providerConfig?.oauth) {
         console.log(`\nInitiating OAuth flow for ${providerId}...`);
         try {
-            const credentials = await oauthProvider.login({
+            await authStorage.login(providerId, {
                 onAuth: (info) => {
                     console.log(`\nPlease authenticate via your browser: ${info.url}`);
                     if (info.instructions) console.log(info.instructions);
@@ -279,7 +278,6 @@ async function checkAndSetupAuth(rl, providerId, force = false) {
                 onProgress: (msg) => console.log(msg)
             });
 
-            authStorage.set(providerId, { type: 'oauth', ...credentials });
             console.log('Authentication successful!');
             await prompt(rl, 'Press Enter to continue...');
         } catch (err) {

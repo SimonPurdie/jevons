@@ -20,7 +20,10 @@
 - Before Discord sends, force a dispatcher from the same undici version used by Discord (`app/discord.js` now calls `setGlobalDispatcher(new EnvHttpProxyAgent())` from the top-level `undici` dependency).
 
 **pi package scope/API**:
-- Current pi packages use the `@earendil-works/*` npm scope. Legacy catalog helpers like `getModel`, `getModels`, `getProviders`, and `registerApiProvider` are available from `@earendil-works/pi-ai/compat`; OAuth helpers like `getOAuthProvider(s)` are available from `@earendil-works/pi-ai/oauth`.
+- Current pi packages use the `@earendil-works/*` npm scope. Legacy catalog helpers like `getModel`, `getModels`, `getProviders`, and `registerApiProvider` are available from `@earendil-works/pi-ai/compat`.
+- In pi `0.82.x`, `@earendil-works/pi-ai/oauth` is type-only: do not import runtime helpers such as `getOAuthProvider(s)` or OpenAI Codex login constants from it. Use `ModelRuntime.login(providerId, 'oauth', interaction)` from `@earendil-works/pi-coding-agent` with an `AuthInteraction` bridge instead.
+- In pi `0.82.x`, `AuthStorage`/`FileAuthStorageBackend` are no longer exported from the `@earendil-works/pi-coding-agent` package root. Apps should provide their own `CredentialStore` implementation (or use `ModelRuntime` with an injected store) rather than importing those internals.
+- `generateSummary`/compaction utilities now expect LLM-style message content blocks. If session messages contain plain string `content`, normalize to `[{ type: 'text', text: content }]` before summarization.
 
 **Provider API model-list truncation**
 - `provider_api` text previews are capped (`MAX_TEXT_PREVIEW`) and can truncate large JSON payloads (like `GET .../v1beta/models`) before newer model names appear.

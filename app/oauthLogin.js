@@ -1,7 +1,5 @@
-import {
-  OPENAI_CODEX_BROWSER_LOGIN_METHOD,
-  OPENAI_CODEX_DEVICE_CODE_LOGIN_METHOD
-} from '@earendil-works/pi-ai/oauth';
+const OPENAI_CODEX_BROWSER_LOGIN_METHOD = 'browser';
+const OPENAI_CODEX_DEVICE_CODE_LOGIN_METHOD = 'device_code';
 
 function isOpenAICodexLoginMethodPrompt(providerId, selectPrompt) {
   if (providerId !== 'openai-codex' || !Array.isArray(selectPrompt?.options)) {
