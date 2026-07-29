@@ -123,7 +123,7 @@ export function createDiscordBot(options) {
     throw new Error('Discord client must support .on(event, handler)');
   }
 
-  client.on('ready', async () => {
+  client.on('clientReady', async () => {
     // Sync commands if applicationId is provided
     if (applicationId) {
       await ensureCommandsRegistered(client, token, applicationId);

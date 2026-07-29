@@ -677,7 +677,18 @@ export async function generateReply(payload, modelInstance, options = {}) {
   const timeInjection = formatCurrentTime();
   const content = `${timeInjection}\n${trimmed}`;
 
-  const { Agent: AgentClass } = options.Agent ? { Agent: options.Agent } : await (options.resolvePiAgentCore || resolvePiAgentCore)();
+  const usesInjectedAgent = typeof options.Agent === 'function';
+  const { Agent: AgentClass } = usesInjectedAgent
+    ? { Agent: options.Agent }
+    : await (options.resolvePiAgentCore || resolvePiAgentCore)();
+  let streamFn = options.streamFn;
+  if (typeof streamFn !== 'function' && !usesInjectedAgent) {
+    const piAi = await (options.resolvePiAi || resolvePiAi)();
+    streamFn = piAi.streamSimple;
+  }
+  if (typeof streamFn !== 'function' && !usesInjectedAgent) {
+    throw new Error('pi-ai does not export streamSimple; check that the pi package versions match.');
+  }
 
   // Get session context for this Discord context
   let sessionContext = { messages: [] };
@@ -704,6 +715,7 @@ export async function generateReply(payload, modelInstance, options = {}) {
 
   const agent = new AgentClass({
     initialState,
+    ...(typeof streamFn === 'function' ? { streamFn } : {}),
     getApiKey: async (provider) => {
       if (options.authStorage) {
         const key = await options.authStorage.getApiKey(provider);

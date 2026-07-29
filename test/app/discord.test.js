@@ -90,6 +90,24 @@ test('createDiscordBot start calls login with token', async () => {
   assert.deepEqual(client.loginCalls, ['token-123']);
 });
 
+test('createDiscordBot handles the clientReady event', () => {
+  const client = new MockDiscordClient();
+  let readyCalls = 0;
+  createDiscordBot({
+    client,
+    token: 'token-123',
+    channelId: 'root',
+    onMessage: () => { },
+    onReady: () => {
+      readyCalls += 1;
+    },
+  });
+
+  client.emit('clientReady');
+
+  assert.equal(readyCalls, 1);
+});
+
 test('createDiscordBot filters messages and handles threads', () => {
   const client = new MockDiscordClient();
   const received = [];

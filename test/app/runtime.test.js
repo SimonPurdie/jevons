@@ -4,7 +4,7 @@ import { EventEmitter } from 'events';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { createDiscordRuntime } from '../../app/runtime.js';
+import { createDiscordRuntime, generateReply } from '../../app/runtime.js';
 import { DiscordSessionManager } from '../../app/sessionManager.js';
 
 class MockDiscordClient extends EventEmitter {
@@ -85,6 +85,48 @@ function readDebugInteractions(logPath) {
   }
   return entries;
 }
+
+test('generateReply passes pi-ai streamSimple to pi-agent-core Agent', async () => {
+  const streamSimple = () => {
+    throw new Error('The capturing Agent should not invoke the stream function');
+  };
+  let agentOptions;
+
+  class CapturingAgent {
+    constructor(options) {
+      agentOptions = options;
+      this.state = {
+        ...options.initialState,
+        messages: [...options.initialState.messages],
+      };
+    }
+
+    async prompt(message) {
+      this.state.messages.push(message, {
+        role: 'assistant',
+        content: [{ type: 'text', text: 'stream configured' }],
+      });
+    }
+  }
+
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jevons-stream-test-'));
+  try {
+    const reply = await generateReply(
+      { content: 'hello' },
+      { id: 'test-model', provider: 'test-provider' },
+      {
+        resolvePiAgentCore: async () => ({ Agent: CapturingAgent }),
+        resolvePiAi: async () => ({ streamSimple }),
+        agentDebugLogPath: path.join(tempDir, 'agent.log'),
+      }
+    );
+
+    assert.strictEqual(agentOptions.streamFn, streamSimple);
+    assert.equal(reply.content, 'stream configured');
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
 
 test('createDiscordRuntime sends model reply via sendMessage', async () => {
   const client = new MockDiscordClient();
